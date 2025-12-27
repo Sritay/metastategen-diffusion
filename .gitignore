@@ -9,7 +9,8 @@ venv/
 .env
 
 # Data and Artifacts
-data/
+/data/
+!src/**/data/
 runs/
 *.pt
 *.npz
