@@ -1,0 +1,56 @@
+Directory tree for: /mnt/lustre/a2fs-work3/work/e760/e760/sritay/metastategen-diffusion/src
+[drwxr-xr-x sritay   e760       4.0K Dec 25 11:18] ├── metastategen
+[-rw-r--r-- sritay   e760      49.0B Dec 24 22:25] │   ├── __init__.py
+[drwxr-xr-x sritay   e760       4.0K Dec 25 12:22] │   ├── __pycache__
+[-rw-r--r-- sritay   e760     230.0B Dec 25 12:22] │   │   ├── __init__.cpython-311.pyc
+[-rw-r--r-- sritay   e760       6.0K Dec 24 22:25] │   │   └── cli.cpython-311.pyc
+[-rw-r--r-- sritay   e760       3.2K Dec 24 22:25] │   ├── cli.py
+[drwxr-xr-x sritay   e760       4.0K Dec 25 12:22] │   ├── data
+[-rw-r--r-- sritay   e760      33.0B Dec 25 11:18] │   │   ├── __init__.py
+[drwxr-xr-x sritay   e760       4.0K Dec 25 12:22] │   │   ├── __pycache__
+[-rw-r--r-- sritay   e760     245.0B Dec 25 12:22] │   │   │   ├── __init__.cpython-311.pyc
+[-rw-r--r-- sritay   e760       4.2K Dec 25 12:22] │   │   │   └── dataset.cpython-311.pyc
+[-rw-r--r-- sritay   e760       2.5K Dec 25 11:18] │   │   └── dataset.py
+[drwxr-xr-x sritay   e760       4.0K Dec 25 17:28] │   ├── eval
+[-rw-r--r-- sritay   e760     234.0B Dec 25 17:34] │   │   ├── __init__.py
+[drwxr-xr-x sritay   e760       4.0K Dec 25 21:07] │   │   ├── __pycache__
+[-rw-r--r-- sritay   e760     584.0B Dec 25 21:07] │   │   │   ├── __init__.cpython-311.pyc
+[-rw-r--r-- sritay   e760       2.6K Dec 25 20:49] │   │   │   ├── coverage.cpython-311.pyc
+[-rw-r--r-- sritay   e760       1.5K Dec 25 18:02] │   │   │   ├── coverage.cpython-38.pyc
+[-rw-r--r-- sritay   e760       4.8K Dec 25 13:41] │   │   │   ├── free_energy.cpython-311.pyc
+[-rw-r--r-- sritay   e760       6.7K Dec 25 13:41] │   │   │   ├── ramachandran.cpython-311.pyc
+[-rw-r--r-- sritay   e760       6.0K Dec 25 20:49] │   │   │   ├── rmsd.cpython-311.pyc
+[-rw-r--r-- sritay   e760       2.9K Dec 25 18:02] │   │   │   └── rmsd.cpython-38.pyc
+[-rw-r--r-- sritay   e760       1.3K Dec 25 17:28] │   │   ├── coverage.py
+[-rw-r--r-- sritay   e760       1.7K Dec 25 11:18] │   │   ├── dihedrals.py
+[-rw-r--r-- sritay   e760       2.4K Dec 24 22:25] │   │   ├── free_energy.py
+[-rw-r--r-- sritay   e760       3.5K Dec 24 22:25] │   │   ├── ramachandran.py
+[-rw-r--r-- sritay   e760       3.3K Dec 25 17:28] │   │   └── rmsd.py
+[drwxr-xr-x sritay   e760       4.0K Dec 25 17:27] │   ├── models
+[drwxr-xr-x sritay   e760       4.0K Dec 25 18:02] │   │   ├── __pycache__
+[-rw-r--r-- sritay   e760      12.9K Dec 25 12:35] │   │   │   ├── diffusion.cpython-311.pyc
+[-rw-r--r-- sritay   e760      10.1K Dec 25 12:27] │   │   │   ├── egnn.cpython-311.pyc
+[-rw-r--r-- sritay   e760       8.4K Dec 25 19:28] │   │   │   ├── ensemble.cpython-311.pyc
+[-rw-r--r-- sritay   e760       4.6K Dec 25 18:02] │   │   │   └── ensemble.cpython-38.pyc
+[-rw-r--r-- sritay   e760       8.5K Dec 25 12:35] │   │   ├── diffusion.py
+[-rw-r--r-- sritay   e760       6.3K Dec 25 12:27] │   │   ├── egnn.py
+[-rw-r--r-- sritay   e760       4.3K Dec 25 17:27] │   │   └── ensemble.py
+[drwxr-xr-x sritay   e760       4.0K Dec 25 13:25] │   └── utils
+[-rw-r--r-- sritay   e760      69.0B Dec 24 22:25] │       ├── __init__.py
+[drwxr-xr-x sritay   e760       4.0K Dec 25 13:31] │       ├── __pycache__
+[-rw-r--r-- sritay   e760     307.0B Dec 25 12:22] │       │   ├── __init__.cpython-311.pyc
+[-rw-r--r-- sritay   e760       2.1K Dec 25 13:31] │       │   ├── geometry.cpython-311.pyc
+[-rw-r--r-- sritay   e760       1.3K Dec 25 12:22] │       │   ├── logging.cpython-311.pyc
+[-rw-r--r-- sritay   e760       3.5K Dec 25 13:31] │       │   ├── pdb.cpython-311.pyc
+[-rw-r--r-- sritay   e760       1.5K Dec 25 12:22] │       │   └── seed.cpython-311.pyc
+[-rw-r--r-- sritay   e760       1.4K Dec 25 11:18] │       ├── geometry.py
+[-rw-r--r-- sritay   e760     640.0B Dec 24 22:25] │       ├── logging.py
+[-rw-r--r-- sritay   e760       2.5K Dec 25 11:18] │       ├── pdb.py
+[-rw-r--r-- sritay   e760     746.0B Dec 24 22:25] │       └── seed.py
+[drwxr-xr-x sritay   e760       4.0K Dec 24 22:25] └── metastategen.egg-info
+[-rw-r--r-- sritay   e760       1.0B Dec 24 22:25]     ├── dependency_links.txt
+[-rw-r--r-- sritay   e760      48.0B Dec 24 22:25]     ├── entry_points.txt
+[-rw-r--r-- sritay   e760     448.0B Dec 24 22:25]     ├── PKG-INFO
+[-rw-r--r-- sritay   e760      56.0B Dec 24 22:25]     ├── requires.txt
+[-rw-r--r-- sritay   e760     479.0B Dec 24 22:25]     ├── SOURCES.txt
+[-rw-r--r-- sritay   e760      18.0B Dec 24 22:25]     └── top_level.txt

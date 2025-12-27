@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environments
+mypyenv/
+venv/
+.env
+
+# Data and Artifacts
+data/
+runs/
+*.pt
+*.npz
+*.pdb
+
+# IDEs
+.vscode/
+.idea/
+
+# SLURM logs
+slurm-*.out
+
+# System
+.DS_Store

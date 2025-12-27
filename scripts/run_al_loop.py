@@ -1,0 +1,585 @@
+from __future__ import annotations
+
+import argparse
+import csv
+import time
+from pathlib import Path
+
+import numpy as np
+import torch
+import yaml
+
+from metastategen.active_learning import select_acquisition
+try:
+    from metastategen.data import ALDataManager, load_al_data
+except ImportError:  # Fallback for older package exports.
+    from metastategen.data.manager import ALDataManager, load_al_data
+from metastategen.eval.coverage import kl_from_phi_psi
+from metastategen.eval.rmsd import greedy_cluster, rmsd_kabsch
+from metastategen.models.diffusion import center
+from metastategen.models.ensemble import (
+    Ensemble,
+    build_diffusion_from_cfg,
+    build_model_from_cfg,
+    center_ensemble,
+    per_sample_uncertainty_from_var,
+)
+from metastategen.oracles import DatasetOracle
+from metastategen.utils import get_logger, set_deterministic
+from metastategen.utils.geometry import compute_dihedrals, rad2deg
+from metastategen.utils.pdb import get_ala2_heavy_atom_indices
+
+log = get_logger("run_al_loop")
+
+
+def _resolve_run_root(cfg: dict) -> Path:
+    al_cfg = cfg.get("active_learning", {})
+    exp_id = al_cfg.get("exp_id", "al_loop")
+    out_dir = al_cfg.get("out_dir", f"runs/{exp_id}")
+    return Path(out_dir)
+
+
+def _resolve_seeds(cfg: dict) -> list[int]:
+    ens_cfg = cfg.get("ensemble", {})
+    seeds = ens_cfg.get("seeds")
+    if seeds is not None:
+        return [int(s) for s in seeds]
+    members = int(ens_cfg.get("members", 1))
+    base_seed = int(ens_cfg.get("base_seed", cfg.get("train", {}).get("seed", 0)))
+    return [base_seed + i for i in range(members)]
+
+
+def _build_dataloader(dataset, batch_size: int, num_workers: int, seed: int):
+    g = torch.Generator()
+    g.manual_seed(seed)
+    return torch.utils.data.DataLoader(
+        dataset,
+        batch_size=batch_size,
+        shuffle=True,
+        num_workers=num_workers,
+        generator=g,
+    )
+
+
+def _save_member_logs(member_dir: Path, logs: list[dict]) -> None:
+    if not logs:
+        return
+    keys = sorted({k for row in logs for k in row.keys()})
+    out_path = member_dir / "train_log.csv"
+    with out_path.open("w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=keys)
+        writer.writeheader()
+        writer.writerows(logs)
+
+
+def _save_checkpoint(member_dir: Path, state: dict, iter_idx: int, cfg: dict) -> None:
+    ckpt_dir = member_dir / "checkpoints"
+    ckpt_dir.mkdir(parents=True, exist_ok=True)
+    ckpt = {
+        "iter": iter_idx,
+        "epoch": state["epoch"],
+        "model": state["model"].state_dict(),
+        "opt": state["opt"].state_dict(),
+        "config": cfg,
+    }
+    torch.save(ckpt, ckpt_dir / f"iter_{iter_idx:02d}.pt")
+
+
+def _train_member(
+    state: dict,
+    diffusion,
+    dataloader,
+    epochs: int,
+    grad_clip: float,
+    rot_aug: bool,
+    iter_idx: int,
+) -> None:
+    model = state["model"]
+    opt = state["opt"]
+    device = state["device"]
+
+    start = time.time()
+    for _ in range(epochs):
+        state["epoch"] += 1
+        model.train()
+        losses = []
+        for batch in dataloader:
+            x = batch["x"].to(device)
+            a = batch["a"].to(device)
+            bsz = x.shape[0]
+            t = torch.randint(1, diffusion.cfg.T + 1, (bsz,), device=device)
+            loss, _ = diffusion.training_loss(model, x, a, t, rot_aug=rot_aug)
+            opt.zero_grad()
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
+            opt.step()
+            losses.append(loss.item())
+
+        train_loss = float(sum(losses) / max(1, len(losses)))
+        state["logs"].append(
+            {
+                "iter": iter_idx,
+                "epoch": state["epoch"],
+                "train_loss": train_loss,
+                "elapsed_s": time.time() - start,
+            }
+        )
+
+
+@torch.no_grad()
+def _consensus_ddpm(ensemble: Ensemble, diffusion, shape: tuple[int, ...], h: torch.Tensor):
+    device = diffusion.betas.device
+    bsz = shape[0]
+    xt = torch.randn(shape, device=device)
+    if diffusion.cfg.recenter_every_step:
+        xt = center(xt)
+
+    unc_accum = torch.zeros(bsz, device=device)
+    steps = 0
+
+    for i in reversed(range(1, diffusion.cfg.T + 1)):
+        t = torch.full((bsz,), i, device=device, dtype=torch.long)
+        eps_stack = ensemble.predict_eps(xt, h, t)
+        if diffusion.cfg.recenter_every_step:
+            eps_stack = center_ensemble(eps_stack)
+
+        mean_eps = eps_stack.mean(dim=0)
+        var_eps = eps_stack.var(dim=0, unbiased=False)
+        unc_accum += per_sample_uncertainty_from_var(var_eps)
+        steps += 1
+
+        if diffusion.cfg.recenter_every_step:
+            mean_eps = center(mean_eps)
+
+        idx = i - 1
+        beta = diffusion.betas[idx]
+        alpha = diffusion.alphas[idx]
+        alpha_bar = diffusion.alphas_cumprod[idx]
+
+        mean = (1 / torch.sqrt(alpha)) * (xt - (beta / torch.sqrt(1 - alpha_bar)) * mean_eps)
+        if i > 1:
+            sigma = torch.sqrt(diffusion.posterior_variance[idx])
+            noise = torch.randn_like(xt)
+            xt = mean + sigma * noise
+        else:
+            xt = mean
+        if diffusion.cfg.recenter_every_step:
+            xt = center(xt)
+
+    return xt, unc_accum / max(1, steps)
+
+
+@torch.no_grad()
+def _consensus_ddim(
+    ensemble: Ensemble,
+    diffusion,
+    shape: tuple[int, ...],
+    h: torch.Tensor,
+    steps: int,
+    eta: float,
+):
+    device = diffusion.betas.device
+    bsz = shape[0]
+    xt = torch.randn(shape, device=device)
+    if diffusion.cfg.recenter_every_step:
+        xt = center(xt)
+
+    unc_accum = torch.zeros(bsz, device=device)
+    n_steps = 0
+    times = torch.linspace(diffusion.cfg.T, 1, steps).long().to(device)
+
+    for i, t_val in enumerate(times):
+        t = torch.full((bsz,), t_val, device=device, dtype=torch.long)
+        prev_t_val = times[i + 1] if i < len(times) - 1 else torch.tensor(0, device=device)
+
+        eps_stack = ensemble.predict_eps(xt, h, t)
+        if diffusion.cfg.recenter_every_step:
+            eps_stack = center_ensemble(eps_stack)
+
+        mean_eps = eps_stack.mean(dim=0)
+        var_eps = eps_stack.var(dim=0, unbiased=False)
+        unc_accum += per_sample_uncertainty_from_var(var_eps)
+        n_steps += 1
+
+        if diffusion.cfg.recenter_every_step:
+            mean_eps = center(mean_eps)
+
+        idx = t_val - 1
+        prev_idx = prev_t_val - 1
+
+        alpha_bar = diffusion.alphas_cumprod[idx]
+        alpha_bar_prev = diffusion.alphas_cumprod[prev_idx] if prev_t_val > 0 else torch.tensor(1.0, device=device)
+
+        sigma = eta * torch.sqrt((1 - alpha_bar_prev) / (1 - alpha_bar) * (1 - alpha_bar / alpha_bar_prev))
+        pred_x0 = (xt - torch.sqrt(1 - alpha_bar) * mean_eps) / torch.sqrt(alpha_bar)
+        dir_xt = torch.sqrt(1 - alpha_bar_prev - sigma**2) * mean_eps
+        noise = torch.randn_like(xt) if eta > 0 else 0.0
+
+        xt = torch.sqrt(alpha_bar_prev) * pred_x0 + dir_xt + sigma * noise
+        if diffusion.cfg.recenter_every_step:
+            xt = center(xt)
+
+    return xt, unc_accum / max(1, n_steps)
+
+
+@torch.no_grad()
+def _sample_candidates(
+    ensemble: Ensemble,
+    diffusion,
+    atom_types: torch.Tensor,
+    n_samples: int,
+    batch_size: int,
+    steps: int,
+    eta: float,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    ensemble.eval()
+    device = diffusion.betas.device
+    n_atoms = atom_types.shape[0]
+    samples = []
+    uncertainty = []
+    n_batches = (n_samples + batch_size - 1) // batch_size
+    for i in range(n_batches):
+        curr_bs = min(batch_size, n_samples - len(samples) * batch_size)
+        h = atom_types.unsqueeze(0).expand(curr_bs, -1).to(device)
+        shape = (curr_bs, n_atoms, 3)
+        if eta == 0.0 and steps < diffusion.cfg.T:
+            x0, unc = _consensus_ddim(ensemble, diffusion, shape, h, steps=steps, eta=eta)
+        else:
+            if eta != 0.0 and steps < diffusion.cfg.T:
+                log.warning("DDIM steps < T with eta>0 is not supported; using full DDPM steps.")
+            x0, unc = _consensus_ddpm(ensemble, diffusion, shape, h)
+        samples.append(x0.cpu())
+        uncertainty.append(unc.cpu())
+        log.info("Sample batch %d/%d done.", i + 1, n_batches)
+    return torch.cat(samples, dim=0), torch.cat(uncertainty, dim=0)
+
+
+def _compute_phi_psi(samples: torch.Tensor, pdb_path: Path) -> np.ndarray:
+    phi_idx, psi_idx = get_ala2_heavy_atom_indices(pdb_path)
+    indices = torch.tensor([phi_idx, psi_idx], dtype=torch.long, device=samples.device)
+    rads = compute_dihedrals(samples, indices)
+    degs = rad2deg(rads)
+    degs = (degs + 180.0) % 360.0 - 180.0
+    return degs.cpu().numpy()
+
+
+def _basin_coverage(samples: torch.Tensor, medoids: torch.Tensor, rmsd_thresh: float) -> int:
+    samples = samples.to(dtype=torch.float64, device="cpu")
+    medoids = medoids.to(dtype=torch.float64, device="cpu")
+
+    covered = set()
+    for i in range(samples.shape[0]):
+        cand = samples[i].unsqueeze(0).expand(medoids.shape[0], -1, -1)
+        rmsds = rmsd_kabsch(cand, medoids)
+        best = int(torch.argmin(rmsds).item())
+        if float(rmsds[best].item()) <= rmsd_thresh:
+            covered.add(best)
+    return len(covered)
+
+
+def _evaluate(
+    ensemble: Ensemble,
+    diffusion,
+    atom_types: torch.Tensor,
+    val_phi_psi: np.ndarray,
+    val_medoids: torch.Tensor,
+    cfg: dict,
+    iter_dir: Path,
+    seed: int,
+) -> dict:
+    al_cfg = cfg.get("active_learning", {})
+    n_eval = int(al_cfg.get("eval_samples", 1000))
+    batch_size = int(al_cfg.get("sample_batch_size", 200))
+    steps = int(al_cfg.get("sample_steps", 100))
+    eta = float(al_cfg.get("sample_eta", 0.0))
+    rmsd_thresh = float(al_cfg.get("rmsd_thresh", 0.75))
+
+    set_deterministic(seed)
+    samples, _ = _sample_candidates(ensemble, diffusion, atom_types, n_eval, batch_size, steps, eta)
+    torch.save(samples, iter_dir / "eval_samples.pt")
+
+    meta_path = Path(cfg["data"].get("meta_path", "data/processed/ala2/meta.pt"))
+    meta = torch.load(meta_path)
+    pdb_path = Path(meta.get("pdb_path", "data/raw/alanine-dipeptide-nowater.pdb"))
+
+    gen_phi_psi = _compute_phi_psi(samples.to(diffusion.betas.device), pdb_path)
+    kl = kl_from_phi_psi(gen_phi_psi, val_phi_psi, bins=int(al_cfg.get("phi_psi_bins", 180)))
+    basin_count = _basin_coverage(samples, val_medoids, rmsd_thresh=rmsd_thresh)
+    basin_frac = basin_count / max(1, val_medoids.shape[0])
+
+    return {
+        "kl_to_val": kl,
+        "basin_count": basin_count,
+        "basin_fraction": basin_frac,
+        "eval_samples": n_eval,
+    }
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--config", type=str, default="configs/ala2_al.yaml")
+    args = ap.parse_args()
+
+    with open(args.config, "r") as f:
+        cfg = yaml.safe_load(f)
+
+    al_cfg = cfg.get("active_learning", {})
+    data_cfg = cfg.get("data", {})
+    train_cfg = cfg.get("train", {})
+
+    run_root = _resolve_run_root(cfg)
+    run_root.mkdir(parents=True, exist_ok=True)
+    with (run_root / "config.yaml").open("w") as f:
+        yaml.safe_dump(cfg, f, sort_keys=False)
+
+    seed_path = data_cfg.get("seed_path")
+    pool_path = data_cfg.get("pool_path")
+    val_path = data_cfg.get("val_path")
+    if not seed_path or not pool_path or not val_path:
+        raise ValueError("data.seed_path, data.pool_path, and data.val_path must be set")
+
+    for p in (seed_path, pool_path, val_path):
+        if not Path(p).exists():
+            raise FileNotFoundError(f"Missing AL split file: {p}")
+
+    seed_data = load_al_data(seed_path)
+    val_data = load_al_data(val_path)
+
+    manager = ALDataManager(seed_data)
+
+    atom_types = seed_data["atom_types"]
+    n_atom_types = int(atom_types.max().item()) + 1
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    diffusion = build_diffusion_from_cfg(cfg).to(device)
+
+    member_states = []
+    seeds = _resolve_seeds(cfg)
+    for idx, seed in enumerate(seeds):
+        set_deterministic(seed)
+        model = build_model_from_cfg(cfg, n_atom_types=n_atom_types).to(device)
+        opt = torch.optim.Adam(model.parameters(), lr=float(train_cfg.get("lr", 3e-4)))
+        member_dir = run_root / "members" / f"m{idx:03d}"
+        member_dir.mkdir(parents=True, exist_ok=True)
+        state = {
+            "model": model,
+            "opt": opt,
+            "epoch": 0,
+            "logs": [],
+            "device": device,
+            "seed": seed,
+            "member_dir": member_dir,
+        }
+        member_states.append(state)
+
+    ensemble = Ensemble([s["model"] for s in member_states])
+
+    oracle_device = al_cfg.get("oracle_device", "cpu")
+    oracle = DatasetOracle(pool_path, device=oracle_device, batch_size=int(al_cfg.get("oracle_batch_size", 100)))
+
+    val_phi_psi = None
+    if "phi_psi" in val_data:
+        val_phi_psi = val_data["phi_psi"].cpu().numpy()
+    else:
+        meta_path = Path(data_cfg.get("meta_path", "data/processed/ala2/meta.pt"))
+        meta = torch.load(meta_path)
+        pdb_path = Path(meta.get("pdb_path", "data/raw/alanine-dipeptide-nowater.pdb"))
+        val_phi_psi = _compute_phi_psi(val_data["positions"].to(device), pdb_path)
+
+    rmsd_thresh = float(al_cfg.get("rmsd_thresh", 0.75))
+    _, val_medoids_idx, _ = greedy_cluster(val_data["positions"], rmsd_thresh=rmsd_thresh)
+    val_medoids = val_data["positions"][val_medoids_idx]
+    log.info("Val basins: %d", len(val_medoids_idx))
+
+    used_pool_indices = set()
+
+    metrics_path = run_root / "al_metrics.csv"
+    metrics_rows = []
+
+    # Phase 0: cold-start training on seed
+    init_epochs = int(train_cfg.get("epochs", 5))
+    log.info("Cold start: training %d epochs on seed (%d frames)", init_epochs, manager.size())
+    for state in member_states:
+        dl = _build_dataloader(
+            manager.dataset(),
+            batch_size=int(data_cfg.get("batch_size", 256)),
+            num_workers=int(data_cfg.get("num_workers", 0)),
+            seed=state["seed"],
+        )
+        _train_member(
+            state,
+            diffusion,
+            dl,
+            epochs=init_epochs,
+            grad_clip=float(train_cfg.get("grad_clip", 1.0)),
+            rot_aug=bool(train_cfg.get("rot_aug", True)),
+            iter_idx=0,
+        )
+        _save_checkpoint(state["member_dir"], state, iter_idx=0, cfg=cfg)
+        _save_member_logs(state["member_dir"], state["logs"])
+
+    iter_dir = run_root / "iter_00"
+    iter_dir.mkdir(parents=True, exist_ok=True)
+    eval_seed = int(al_cfg.get("seed", train_cfg.get("seed", 0)))
+    metrics = _evaluate(ensemble, diffusion, atom_types, val_phi_psi, val_medoids, cfg, iter_dir, eval_seed)
+    metrics.update(
+        {
+            "iter": 0,
+            "oracle_calls": 0,
+            "train_size": manager.size(),
+        }
+    )
+    metrics_rows.append(metrics)
+    with metrics_path.open("w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=sorted({k for r in metrics_rows for k in r.keys()}))
+        writer.writeheader()
+        writer.writerows(metrics_rows)
+
+    n_iters = int(al_cfg.get("n_iters", 3))
+    n_candidates = int(al_cfg.get("n_candidates", 1000))
+    n_acquire = int(al_cfg.get("n_acquire", 200))
+    strategy = str(al_cfg.get("acquisition_strategy", "uncertainty"))
+
+    for iter_idx in range(1, n_iters + 1):
+        log.info("AL iter %d/%d", iter_idx, n_iters)
+        iter_dir = run_root / f"iter_{iter_idx:02d}"
+        iter_dir.mkdir(parents=True, exist_ok=True)
+
+        sample_seed = int(al_cfg.get("seed", train_cfg.get("seed", 0))) + iter_idx
+        set_deterministic(sample_seed)
+
+        samples, uncertainty = _sample_candidates(
+            ensemble,
+            diffusion,
+            atom_types,
+            n_samples=n_candidates,
+            batch_size=int(al_cfg.get("sample_batch_size", 200)),
+            steps=int(al_cfg.get("sample_steps", 100)),
+            eta=float(al_cfg.get("sample_eta", 0.0)),
+        )
+        torch.save(samples, iter_dir / "candidates.pt")
+        torch.save(uncertainty, iter_dir / "uncertainty.pt")
+
+        gen = torch.Generator()
+        gen.manual_seed(sample_seed)
+        sel_idx = select_acquisition(uncertainty, n_acquire, strategy=strategy, generator=gen)
+        sel_idx = sel_idx.cpu()
+
+        selected = samples[sel_idx]
+        labels = oracle.query(selected.to(oracle.device))
+        pool_idx = oracle.last_indices
+        if pool_idx is None:
+            raise RuntimeError("Oracle did not populate last_indices")
+
+        unique_mask = []
+        for idx in pool_idx.tolist():
+            if idx in used_pool_indices:
+                unique_mask.append(False)
+            else:
+                unique_mask.append(True)
+                used_pool_indices.add(idx)
+        unique_mask = torch.tensor(unique_mask, dtype=torch.bool)
+
+        if unique_mask.sum() < pool_idx.numel():
+            log.warning(
+                "Filtered %d duplicate pool indices in iter %d",
+                int(pool_idx.numel() - unique_mask.sum().item()),
+                iter_idx,
+            )
+
+        pool_idx = pool_idx[unique_mask]
+        selected = selected[unique_mask]
+        labels = labels[unique_mask.to(labels.device)]
+        selected_unc = uncertainty[sel_idx][unique_mask]
+
+        meta = oracle.get_metadata(pool_idx)
+        acquired = {
+            "positions": labels.cpu(),
+            "atom_types": atom_types,
+        }
+        acquired.update(meta)
+        torch.save(acquired, iter_dir / "acquired.pt")
+
+        log_rows = []
+        if pool_idx.numel() > 0:
+            kept_sel_idx = sel_idx[unique_mask]
+            for i, idx in enumerate(pool_idx.tolist()):
+                row = {
+                    "iter": iter_idx,
+                    "candidate_index": int(kept_sel_idx[i].item()),
+                    "pool_index": int(idx),
+                    "uncertainty": float(selected_unc[i].item()),
+                }
+                if "traj_id" in meta:
+                    row["traj_id"] = int(meta["traj_id"][i].item())
+                if "frame_id" in meta:
+                    row["frame_id"] = int(meta["frame_id"][i].item())
+                if "source_index" in meta:
+                    row["source_index"] = int(meta["source_index"][i].item())
+                log_rows.append(row)
+
+        log_path = iter_dir / "acquired_indices.csv"
+        with log_path.open("w", newline="") as f:
+            fieldnames = sorted({k for r in log_rows for k in r.keys()})
+            writer = csv.DictWriter(f, fieldnames=fieldnames or ["iter", "candidate_index", "pool_index"])
+            writer.writeheader()
+            if log_rows:
+                writer.writerows(log_rows)
+
+        manager.append(acquired)
+        torch.save(manager.cumulative_data(), iter_dir / "cumulative.pt")
+
+        finetune_epochs = int(al_cfg.get("finetune_epochs", 5))
+        for state in member_states:
+            dl = _build_dataloader(
+                manager.dataset(),
+                batch_size=int(data_cfg.get("batch_size", 256)),
+                num_workers=int(data_cfg.get("num_workers", 0)),
+                seed=state["seed"] + iter_idx,
+            )
+            _train_member(
+                state,
+                diffusion,
+                dl,
+                epochs=finetune_epochs,
+                grad_clip=float(train_cfg.get("grad_clip", 1.0)),
+                rot_aug=bool(train_cfg.get("rot_aug", True)),
+                iter_idx=iter_idx,
+            )
+            _save_checkpoint(state["member_dir"], state, iter_idx=iter_idx, cfg=cfg)
+            _save_member_logs(state["member_dir"], state["logs"])
+
+        metrics = _evaluate(
+            ensemble,
+            diffusion,
+            atom_types,
+            val_phi_psi,
+            val_medoids,
+            cfg,
+            iter_dir,
+            eval_seed + 1000 + iter_idx,
+        )
+        metrics.update(
+            {
+                "iter": iter_idx,
+                "oracle_calls": int(manager.size() - seed_data["positions"].shape[0]),
+                "train_size": manager.size(),
+            }
+        )
+        metrics_rows.append(metrics)
+
+        with metrics_path.open("w", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=sorted({k for r in metrics_rows for k in r.keys()}))
+            writer.writeheader()
+            writer.writerows(metrics_rows)
+
+    for state in member_states:
+        ckpt_dir = state["member_dir"] / "checkpoints"
+        torch.save(state["model"].state_dict(), ckpt_dir / "final.pt")
+
+    log.info("AL loop complete. Metrics: %s", metrics_path)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

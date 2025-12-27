@@ -1,0 +1,37 @@
+data:
+  data_dir: "data/processed/ala2/shards"
+  meta_path: "data/processed/ala2/meta.pt"
+  batch_size: 256
+  num_workers: 4
+  train_trajs: [0, 1]
+  val_trajs: [2]
+  # Subsample training data to keep epoch fast (e.g. use every 10th frame from shards)
+  frame_subsample: 1 
+
+model:
+  type: "egnn"
+  n_layers: 4
+  hidden_dim: 128
+  time_emb_dim: 128
+  
+diffusion:
+  T: 1000
+  beta_start: 0.0001
+  beta_end: 0.02
+  schedule: "cosine"
+  recenter_every_step: True
+
+train:
+  seed: 42
+  epochs: 50 # Short training for Day 2 baseline
+  lr: 3.0e-4
+  grad_clip: 1.0
+  save_every: 10
+  val_every: 5
+  out_dir: "runs/day2_baseline"
+
+sample:
+  n_samples: 5000
+  steps: 100 # DDIM steps
+  eta: 0.0   # 0 = Deterministic DDIM
+  batch_size: 500

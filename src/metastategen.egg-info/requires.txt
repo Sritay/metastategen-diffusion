@@ -1,0 +1,8 @@
+numpy<2
+scipy
+matplotlib
+pyyaml
+torch
+tqdm
+rich
+mdshare
