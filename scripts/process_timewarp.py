@@ -68,7 +68,30 @@ def main():
     parser.add_argument("--timewarp-dir", type=str, default="data/timewarp")
     parser.add_argument("--outdir", type=str, default="data/processed/ala2")
     parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--force-heavy-only", action="store_true", default=True, help="Filter for only heavy atoms")
+def parse_all_atoms(pdb_path: Path) -> Tuple[List[int], List[str]]:
+    """Parse PDB to find all atoms."""
+    indices = []
+    elements = []
+    idx_counter = 0
+    with open(pdb_path, 'r') as f:
+        for line in f:
+            if line.startswith("ATOM") or line.startswith("HETATM"):
+                elem = line[76:78].strip()
+                if not elem:
+                     name = line[12:16].strip()
+                     elem = "".join([c for c in name if c.isalpha()])[:1]
+                elem = elem.upper()
+                indices.append(idx_counter)
+                elements.append(elem)
+                idx_counter += 1
+    return indices, elements
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--timewarp-dir", type=str, default="data/timewarp")
+    parser.add_argument("--outdir", type=str, default="data/processed/ala2")
+    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--force-heavy-only", action="store_true", default=False, help="Filter for only heavy atoms")
     
     args = parser.parse_args()
     set_deterministic(args.seed)
@@ -88,60 +111,61 @@ def main():
     log.info(f"Found {len(heavy_idx)} heavy atoms: {heavy_elems}")
     
     # Atom types mapping
-    # C=0, N=1, O=2, S=3, other=4 (from preprocess_positions.py)
-    mapping = {"C": 0, "N": 1, "O": 2, "S": 3}
-    atom_types_list = [mapping.get(e, 4) for e in heavy_elems]
+    # C=0, N=1, O=2, S=3, H=4, other=5
+    mapping = {"C": 0, "N": 1, "O": 2, "S": 3, "H": 4}
+    
+    # Select Atoms
+    if args.force_heavy_only:
+        log.info("Filtering for Heavy Atoms (10)...")
+        indices = heavy_idx
+        elements = heavy_elems
+    else:
+        log.info("Using All Atoms (22) including Hydrogens...")
+        indices = list(range(22)) # Assuming fixed size 22
+        # Parse all elements
+        all_indices, all_elements = parse_all_atoms(pdb_path)
+        elements = all_elements
+        
+    atom_types_list = [mapping.get(e, 5) for e in elements]
     atom_types = torch.tensor(atom_types_list, dtype=torch.long)
     
-    # 2. Load Train and Test Data
-    # Look for train/*.npz and test/*.npz
+    # 2. Load Data
     train_files = sorted(list((tw_dir / "train").glob("*.npz")))
     test_files = sorted(list((tw_dir / "test").glob("*.npz")))
-    
     npz_files = train_files + test_files
     
     if not npz_files:
-        raise FileNotFoundError(f"No NPZ found in {tw_dir}/train or {tw_dir}/test")
+        raise FileNotFoundError(f"No NPZ found in {tw_dir}")
         
-    log.info(f"Found {len(npz_files)} files: {[f.name for f in npz_files]}")
-        
-    all_pos = []
-    all_force = []
-    all_energy = []
-    all_traj = []
+    all_pos, all_force, all_energy, all_traj = [], [], [], []
     
     for i, npz in enumerate(npz_files):
-        log.info(f"Loading {npz}...")
         d = np.load(npz)
-        # raw: [T, 22, 3]
-        pos = d['positions']
-        frc = d['forces']
+        pos = d['positions'] # [T, 22, 3]
+        frc = d['forces']     # [T, 22, 3]
         
-        if args.force_heavy_only:
-            pos = pos[:, heavy_idx, :]
-            frc = frc[:, heavy_idx, :]
-            
+        # Select atoms
+        pos = pos[:, indices, :]
+        frc = frc[:, indices, :]
+        
         all_pos.append(torch.from_numpy(pos).float())
         all_force.append(torch.from_numpy(frc).float())
-        # Energy is [T, 2]. We want Potential Energy (index 0) [T]
-        ene = d['energies'][:, 0]
+        
+        ene = d['energies'][:, 0] # [T]
         all_energy.append(torch.from_numpy(ene).float())
         all_traj.append(torch.full((pos.shape[0],), i, dtype=torch.long))
-        
-    # Concatenate
+
     cat_pos = torch.cat(all_pos, dim=0)
     cat_frc = torch.cat(all_force, dim=0)
     cat_energy = torch.cat(all_energy, dim=0)
     cat_traj = torch.cat(all_traj, dim=0)
     
-    # 3. Save
-    # Save Shards (Positions)
+    # Save Shards
     shard_dir = outdir / "shards"
-    # Clean existing shards?
     if shard_dir.exists():
         import shutil
         shutil.rmtree(shard_dir)
-    
+        
     save_shards(shard_dir, cat_pos, atom_types, cat_traj)
     
     # Save Forces
@@ -156,7 +180,7 @@ def main():
     
     # Save Meta
     meta = {
-        "n_atoms": len(heavy_idx),
+        "n_atoms": len(indices),
         "atom_types": atom_types,
         "source": "timewarp",
         "heavy_atoms_only": args.force_heavy_only,

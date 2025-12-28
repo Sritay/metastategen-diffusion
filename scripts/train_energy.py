@@ -170,7 +170,8 @@ def main():
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(opt, mode='min', factor=0.5, patience=cfg['training']['patience'] // 2, verbose=True)
     
     criterion = nn.MSELoss()
-    rho_e = cfg['training'].get('energy_weight', 0.01)
+    rho_e = cfg['training'].get('energy_weight', 1.0)
+    rho_f = cfg['training'].get('force_weight', 1.0)
     
     # 3. Training Loop
     out_dir = Path("runs") / cfg['experiment_name']
@@ -199,17 +200,39 @@ def main():
             # Enable grad on x is handled inside model, but we need to ensure torch retains graph for x
             x.requires_grad_(True)
             
-            E_pred, F_pred = model(x, a, create_graph=True)
+            E_pred, _ = model(x, a, create_graph=True)
             
+            grad_outputs = torch.ones_like(E_pred)
+            gradients = torch.autograd.grad(
+                outputs=E_pred,
+                inputs=x,
+                grad_outputs=grad_outputs,
+                create_graph=True,
+                retain_graph=True,
+                only_inputs=True
+            )[0]
+            
+            # F_pred in normalized units?
+            # F_phys = -grad(E_phys, x)
+            # E_phys = E_pred * e_std + e_mean
+            # F_phys = -grad(E_pred, x) * e_std
+            # F_target_norm = (F_phys - f_mean) / f_std
+            # So F_pred_norm should be:
+            # (-grad(E_pred, x) * e_std - f_mean) / f_std
+            # Assuming f_mean=0:
+            # F_pred_norm = -grad(E_pred, x) * (e_std / f_std)
+            
+            F_pred = -gradients * (e_std / f_std)
+
             # Normalize Targets
             f_target = (f - f_mean) / f_std
-            e_target = (e - e_mean) / e_std
+            e_target = (e - e_mean) / e_std 
             
             # Loss
             loss_f = criterion(F_pred, f_target)
             loss_e = criterion(E_pred, e_target)
             
-            loss = loss_f + rho_e * loss_e
+            loss = rho_f * loss_f + rho_e * loss_e
             
             opt.zero_grad()
             loss.backward()
@@ -243,15 +266,25 @@ def main():
             
             x.requires_grad_(True)
             
-            # We need to manually zero grad for x if reusing? No, new batch.
-            E_pred, F_pred = model(x, a, create_graph=True) # Must enable graph to compute grad(E, x)
+            E_pred, _ = model(x, a, create_graph=True) 
+            
+            grad_outputs = torch.ones_like(E_pred)
+            gradients = torch.autograd.grad(
+                outputs=E_pred,
+                inputs=x,
+                grad_outputs=grad_outputs,
+                create_graph=False, 
+                retain_graph=True,
+                only_inputs=True
+            )[0]
+            F_pred = -gradients * (e_std / f_std)
             
             f_target = (f - f_mean) / f_std
             e_target = (e - e_mean) / e_std
             
             loss_f = criterion(F_pred, f_target)
             loss_e = criterion(E_pred, e_target)
-            loss = loss_f + rho_e * loss_e
+            loss = rho_f * loss_f + rho_e * loss_e
             
             val_losses.append(loss.item())
             val_losses_f.append(loss_f.item())

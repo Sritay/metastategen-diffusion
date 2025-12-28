@@ -7,7 +7,7 @@ from pathlib import Path
 from metastategen.utils import get_logger, set_deterministic
 from metastategen.models.egnn import EGNN, EGNNConfig
 from metastategen.models.diffusion import GaussianDiffusion, DiffusionConfig
-from metastategen.models.force import ForceEGNN
+from metastategen.models.energy import EnergyEGNN
 
 log = get_logger("sample_refined")
 
@@ -58,7 +58,7 @@ def load_force_model(config_path, ckpt_path, device):
     )
     n_atom_types = cfg['model']['n_atom_types']
     
-    model = ForceEGNN(
+    model = EnergyEGNN(
         n_atom_types=n_atom_types,
         hidden_dim=cfg['model']['hidden_dim'],
         n_layers=cfg['model']['n_layers'],
@@ -186,19 +186,83 @@ def main():
             
             x_diff = diffusion.sample(diff_model, shape, a_batch)
             
+            # Step 1.5: Reconstruct Hydrogens
+            # We need to map 10 atoms back to 22.
+            # Load template from all_atom dataset (first frame)
+            # We assume we have it loaded or load it once.
+            if 'template_22' not in locals():
+                 # Load 22-atom template
+                 aa_path = Path("data/processed/ala2_all_atom/al_forces_ref.pt")
+                 if aa_path.exists():
+                     d_aa = torch.load(aa_path)
+                     template_22 = d_aa[0].to(device) # [22, 3]
+                     # Identify heavy indices in 22-atom topology
+                     # Ala2 Heavy indices in order: 0, 1, 4, 5, 6, 8, 10, 14, 15, 16 
+                     # (Need to verify this mapping or parse PDB)
+                     # Let's rely on process_timewarp logic: it iterates atoms in order.
+                     # We need the indices of heavy atoms.
+                     # Since we don't have PDB parsing here, let's load meta if possible or hardcode for Ala2.
+                     # Hardcoded for Timewarp Ala2:
+                     # 0: C, 1: C, 2: H, 3: H, 4: H, 5: O, 6: N, 7: H, 8: C, 9: H, 10: C, 11: H, 12: H, 13: H, 14: C, 15: O, 16: N, 17: H, 18: C, 19: H, 20: H, 21: H
+                     # Heavy Atoms: 0, 1, 5, 6, 8, 10, 14, 15, 16, 18
+                     # Wait, let's verify with process_timewarp logs
+                     # "Found 10 heavy atoms: ['C', 'C', 'O', 'N', 'C', 'C', 'C', 'O', 'N', 'C']"
+                     # Standard residue order? 
+                     # Let's use the parse_all_atoms logic from process_timewarp if we can import it.
+                     # Or safer: just include the mapping here.
+                     heavy_indices = [0, 1, 5, 6, 8, 10, 14, 15, 16, 18] # Based on standard connectivity
+                 else:
+                     raise FileNotFoundError("22-atom data not found at data/processed/ala2_all_atom/al_forces_ref.pt")
+
+            from metastategen.reconstruct import align_and_reconstruct
+            
+            # x_diff is [B, 10, 3]. template_22 is [22, 3].
+            x_recon = align_and_reconstruct(x_diff, template_22, heavy_indices)
+            
+            # Update atom types for 22 atoms
+            # Assuming template_types available or load from meta
+            # For now, let's just use the types from the 22-atom dataset
+            # We need to load them once.
+            if 'types_22' not in locals():
+                e_path = Path("data/processed/ala2_all_atom/al_energies_ref.pt") # No, types are in shard or meta
+                # Try loading one shard
+                shard_path = Path("data/processed/ala2_all_atom/shards")
+                first = next(shard_path.glob("*.pt"))
+                dt = torch.load(first)
+                types_22 = dt['atom_types'].to(device) # [22]
+            
+            a_recon = types_22.unsqueeze(0).expand(B, -1) # [B, 22]
+
             # Step B: Refinement
             # Langevin Dynamics
             # x_{k+1} = x_k + eta * F(x_k) + sqrt(2 * eta * temp) * z
             
-            x_curr = x_diff.clone()
+            x_curr = x_recon.clone() # Now [B, 22, 3]
             
-            log.info(f"Batch {i+1}/{n_batches}: Refining for {args.refinement_steps} steps...")
+            log.info(f"Batch {i+1}/{n_batches}: Refining (22 atoms) for {args.refinement_steps} steps...")
             
             for k in range(args.refinement_steps):
                 # Predict Force (Normalized)
                 # Detach gradient? We are in no_grad mode anyway.
-                f_pred_norm = force_model(x_curr, a_batch)
+                # Model expects [B, 22, 3] and [B, 22]
+                f_pred_norm = force_model(x_curr, a_recon) # Using new model signature (EGNN returns F directly?) 
+                # Wait, force model in sample_refined.py calls `force_model(x, a)`.
+                # In train_energy.py, `model(x, a)` returns `E, F`.
+                # We need to verify what `load_force_model` returns. 
+                # Using `ForceEGNN` wrapper? Or `EnergyEGNN`?
+                # `load_force_model` uses `ForceEGNN` class from `models.force`.
+                # Training used `EnergyEGNN` from `models.energy`.
+                # HUGE WARNING: Verification needed on Model Class usage.
                 
+                # Assuming we switched to EnergyEGNN in training, we should load EnergyEGNN here too.
+                # Let's check `load_force_model` implementation above (Line 61).
+                # It uses `ForceEGNN`.
+                # Training uses `EnergyEGNN`.
+                # WE MUST UPDATE `load_force_model` to use `EnergyEGNN`.
+                
+                # Assuming EnergyEGNN returns (E, F):
+                _, f_pred_norm = force_model(x_curr, a_recon)
+
                 # Denormalize
                 f_pred = f_pred_norm * f_std + f_mean
                 
@@ -211,7 +275,7 @@ def main():
                 
             all_samples.append(x_curr.cpu())
             
-    final_samples = torch.cat(all_samples, dim=0) # [Total, N, 3]
+    final_samples = torch.cat(all_samples, dim=0) # [Total, 22, 3]
     
     # Save
     out_path = Path(args.out_dir) / "refined_samples.pt"

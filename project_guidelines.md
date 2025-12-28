@@ -30,8 +30,15 @@ We strictly separate the sources for generic sampling vs. force training due to 
 2.  **Forces (Week 2 / Refinement):**
     *   **Source:** `mdshare` *does not* provide the forces we need by default. We use the **TimeWarp** dataset which is already available locally in `data/timewarp`.
     *   **Units:** Verified as **Nanometers** (consistent with MDShare).
-    *   **Atom Count Mismatch:** TimeWarp is **All-Atom (22 atoms)** (including Hydrogens). MDShare/Diffusion is **Heavy-Atom (10 atoms)**.
-    *   **Refinement Strategy:** Use `scripts/process_timewarp.py` with the default `--force-heavy-only` flag. This script filters the TimeWarp data down to the 10 heavy atoms, ensuring it matches the Diffusion model's dimensionality. **Do not** attempt to reconstruct hydrogens; we work strictly in the 10-atom reduced space.
+    *   **Atom Count Strategy (CRITICAL UPDATE):**
+        *   **Diffusion Model:** Operates on **10 heavy atoms** (mdshare data). Data located in `data/processed/ala2`.
+        *   **Force Surrogate:** Operates on **All 22 atoms** (Timewarp data). Data located in **`data/processed/ala2_all_atom`**.
+        *   **Reason:** Forces on heavy atoms are physically dependent on Hydrogen positions. Training on 10 atoms creates "noised" forces and instability.
+        *   **Bridge:** We implemented `src/metastategen/reconstruct.py` to align a 22-atom template to the generated 10-atom backbone. This initialization is then refined by the surrogate.
+    *   **Refinement Strategy:** 
+        *   Use `scripts/process_timewarp.py` (no flags) to generate 22-atom data.
+        *   Train `EnergyEGNN` (not just Force prediction) on the full system using $L = MSE(F) + MSE(E)$.
+        *   Use `scripts/sample_refined.py` which automatically handles the reconstruction and refinement loop.
 
 ### 2.3 Dependency Constraints
 *   **Core Logic:** `torch`, `numpy`, `mdshare`.

@@ -60,7 +60,7 @@ class EGNNConfig:
     node_mlp_layers: int = 2
     coord_mlp_layers: int = 2
     dropout: float = 0.0
-    use_rbf: bool = True
+    use_rbf: bool = False
     rbf_dim: int = 64
     rbf_cutoff: float = 1.0
 

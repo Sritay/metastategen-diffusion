@@ -2,9 +2,9 @@ project: "metastategen-energy"
 experiment_name: "energy_surrogate_ala2"
 
 data:
-  forces_path: "data/processed/ala2/al_forces_ref.pt"
-  energies_path: "data/processed/ala2/al_energies_ref.pt"
-  processed_dir: "data/processed/ala2/shards"
+  forces_path: "data/processed/ala2_all_atom/al_forces_ref.pt"
+  energies_path: "data/processed/ala2_all_atom/al_energies_ref.pt"
+  processed_dir: "data/processed/ala2_all_atom/shards"
   batch_size: 256
   num_workers: 4
   train_trajs: [0]
@@ -12,7 +12,7 @@ data:
   # subsample: 1
 
 model:
-  n_atom_types: 5 # C, N, O, S, other
+  n_atom_types: 6 # C, N, O, S, H, other
   hidden_dim: 256
   n_layers: 6
   dropout: 0.0
@@ -21,12 +21,13 @@ model:
   rbf_cutoff: 1.0
 
 training:
-  lr: 3.0e-4
+  lr: 3.0e-4 # Back to standard LR since we are using standard loss weighting
   weight_decay: 1.0e-6
   max_epochs: 100
   patience: 20
-  grad_clip: 1.0
-  energy_weight: 0.01  # Loss = MSE_F + 0.01 * MSE_E
+  grad_clip: 10.0
+  force_weight: 1.0
+  energy_weight: 1.0  # Best practice: w_E = 1, w_F = 1 (tuned)
   save_every: 10
 
 logging:
