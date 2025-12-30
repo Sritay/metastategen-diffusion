@@ -3,7 +3,7 @@
 #SBATCH --gpus=1
 #SBATCH --qos=gpu-shd
 #SBATCH --account=e760
-#SBATCH --job-name=msgen-refine
+#SBATCH --job-name=msgen-pair
 #SBATCH --time=04:00:00
 set -euo pipefail
 
@@ -51,19 +51,16 @@ singularity exec --cleanenv \
         PY_EXE=python3
     fi
 
-    echo 'Running Refinement (Loop B)...'
+    echo 'Training Pairwise Energy Model...'
+    # Assuming standard converted TimeWarp paths. 
+    # User needs to ensure these files exist (e.g. from process_timewarp.py)
     
-    # Uses best model from Loop 3 (Scientific Fix)
-    # And Pairwise Force Surrogate
+    # Check if we have specific .pt files.
+    # Usually: data/timewarp/train/forces.pt
     
-    \$PY_EXE scripts/sample_refined.py \
-      --diff-config configs/ala2_al_3.yaml \
-      --diff-ckpt runs/day8_9_al_3/iter_03/model.pt \
-      --force-ckpt runs/energy_pairwise/best_model.pt \
-      --n-samples 2000 \
-      --batch-size 200 \
-      --refinement-steps 200 \
-      --step-size 1e-4 \
-      --temperature 0 \
-      --out-dir runs/loop_b_final
+    \$PY_EXE scripts/train_pairwise.py \
+      --forces data/timewarp/train/forces.pt \
+      --energies data/timewarp/train/energies.pt \
+      --epochs 100 \
+      --lr 0.001
   "
