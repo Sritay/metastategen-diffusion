@@ -302,8 +302,13 @@ def _evaluate(
     meta = torch.load(meta_path)
     pdb_path = Path(meta.get("pdb_path", "data/raw/alanine-dipeptide-nowater.pdb"))
 
-    gen_phi_psi = _compute_phi_psi(samples.to(diffusion.betas.device), pdb_path)
-    kl = kl_from_phi_psi(gen_phi_psi, val_phi_psi, bins=int(al_cfg.get("phi_psi_bins", 180)))
+    if pdb_path.exists():
+        gen_phi_psi = _compute_phi_psi(samples.to(diffusion.betas.device), pdb_path)
+        kl = kl_from_phi_psi(gen_phi_psi, val_phi_psi, bins=int(al_cfg.get("phi_psi_bins", 180)))
+    else:
+        log.warning("PDB not found at %s. Skipping Phi/Psi KL divergence.", pdb_path)
+        kl = -1.0
+
     basin_count = _basin_coverage(samples, val_medoids, rmsd_thresh=rmsd_thresh)
     basin_frac = basin_count / max(1, val_medoids.shape[0])
 
@@ -384,7 +389,11 @@ def main() -> int:
         meta_path = Path(data_cfg.get("meta_path", "data/processed/ala2/meta.pt"))
         meta = torch.load(meta_path)
         pdb_path = Path(meta.get("pdb_path", "data/raw/alanine-dipeptide-nowater.pdb"))
-        val_phi_psi = _compute_phi_psi(val_data["positions"].to(device), pdb_path)
+        if pdb_path.exists():
+            val_phi_psi = _compute_phi_psi(val_data["positions"].to(device), pdb_path)
+        else:
+            log.warning("PDB not found at %s. Val Phi/Psi will be None.", pdb_path)
+            val_phi_psi = None
 
     rmsd_thresh = float(al_cfg.get("rmsd_thresh", 0.75))
     _, val_medoids_idx, _ = greedy_cluster(val_data["positions"], rmsd_thresh=rmsd_thresh)

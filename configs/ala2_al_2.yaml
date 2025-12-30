@@ -1,0 +1,55 @@
+ensemble:
+  exp_id: day8_9_al_2
+  out_dir: runs/day8_9_al_2
+  members: 3
+  seeds:
+  - 111
+  - 222
+  - 333
+data:
+  seed_path: data/processed/ala2/split_2/al_seed.pt
+  pool_path: data/processed/ala2/split_2/al_pool_ref.pt
+  val_path: data/processed/ala2/split_2/al_val.pt
+  meta_path: data/processed/ala2/meta.pt
+  batch_size: 256
+  num_workers: 4
+model:
+  type: egnn
+  n_layers: 4
+  hidden_dim: 128
+  time_emb_dim: 128
+diffusion:
+  T: 1000
+  beta_start: 0.0001
+  beta_end: 0.02
+  schedule: cosine
+  recenter_every_step: true
+train:
+  seed: 42
+  epochs: 100  # Increased from 10 to 100 for better initial learning
+  lr: 0.0003
+  grad_clip: 1.0
+  rot_aug: true
+active_learning:
+  exp_id: day8_9_al_2
+  out_dir: runs/day8_9_al_2
+  initial_seed_size: 1000  # Increased from 100 to 1000
+  oracle_pool_source: data/processed/ala2/shards
+  split_out_dir: data/processed/ala2/split_2
+  seed_traj: 0
+  val_traj: 1
+  val_size: 2000
+  n_iters: 3
+  n_candidates: 2000  # Increased from 1000 to 2000 to find diverse queries
+  n_acquire: 200
+  acquisition_strategy: uncertainty
+  finetune_epochs: 10  # Increased finetuning slightly (optional, but good practice)
+  eval_samples: 1000
+  sample_batch_size: 200
+  sample_steps: 100
+  sample_eta: 0.0
+  oracle_batch_size: 100
+  oracle_device: cpu
+  rmsd_thresh: 0.75
+  phi_psi_bins: 180
+  seed: 123

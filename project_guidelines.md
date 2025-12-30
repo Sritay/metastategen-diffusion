@@ -31,14 +31,11 @@ We strictly separate the sources for generic sampling vs. force training due to 
     *   **Source:** `mdshare` *does not* provide the forces we need by default. We use the **TimeWarp** dataset which is already available locally in `data/timewarp`.
     *   **Units:** Verified as **Nanometers** (consistent with MDShare).
     *   **Atom Count Strategy (CRITICAL UPDATE):**
-        *   **Diffusion Model:** Operates on **10 heavy atoms** (mdshare data). Data located in `data/processed/ala2`.
-        *   **Force Surrogate:** Operates on **All 22 atoms** (Timewarp data). Data located in **`data/processed/ala2_all_atom`**.
+        *   **Diffusion Model:** Operates on **10 heavy atoms** (mdshare data).
+        *   **Force Surrogate:** Operates on **All 22 atoms** (Timewarp data).
         *   **Reason:** Forces on heavy atoms are physically dependent on Hydrogen positions. Training on 10 atoms creates "noised" forces and instability.
-        *   **Bridge:** We implemented `src/metastategen/reconstruct.py` to align a 22-atom template to the generated 10-atom backbone. This initialization is then refined by the surrogate.
-    *   **Refinement Strategy:** 
-        *   Use `scripts/process_timewarp.py` (no flags) to generate 22-atom data.
-        *   Train `EnergyEGNN` (not just Force prediction) on the full system using $L = MSE(F) + MSE(E)$.
-        *   Use `scripts/sample_refined.py` which automatically handles the reconstruction and refinement loop.
+        *   **Bridge:** To refine a diffusion sample, we must **reconstruct Hydrogens** (e.g., using `pdbfixer` or geometric generic placement) before passing it to the Force Surrogate.
+    *   **Refinement Strategy:** Use `scripts/process_timewarp.py` with `force_heavy_only=False`. We train the surrogate on the full physical system.
 
 ### 2.3 Dependency Constraints
 *   **Core Logic:** `torch`, `numpy`, `mdshare`.

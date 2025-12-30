@@ -3,7 +3,7 @@ import torch
 from pathlib import Path
 
 def main():
-    forces_path = "data/processed/ala2/al_forces_ref.pt"
+    forces_path = "data/processed/ala2_all_atom/al_forces_ref.pt"
     if not Path(forces_path).exists():
         print("Forces file not found.")
         return

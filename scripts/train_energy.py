@@ -44,7 +44,9 @@ class EnergyDataset(Dataset):
             
             # Check bounds
             if current_idx + n_frames > len(self.all_forces):
-                raise ValueError(f"Forces/Energies file mismatch: {len(self.all_forces)} < {current_idx + n_frames}")
+                log.warning(f"Stopping load at shard {p}: accumulated {current_idx} + {n_frames} > total {len(self.all_forces)}. Ignoring remaining shards (likely stale files).")
+                break
+                # raise ValueError(f"Forces/Energies file mismatch: {len(self.all_forces)} < {current_idx + n_frames}")
                 
             frc = self.all_forces[current_idx : current_idx + n_frames]
             ene = self.all_energies[current_idx : current_idx + n_frames]

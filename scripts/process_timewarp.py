@@ -128,6 +128,7 @@ def main():
         
     atom_types_list = [mapping.get(e, 5) for e in elements]
     atom_types = torch.tensor(atom_types_list, dtype=torch.long)
+    log.info(f"Selected {len(indices)} atoms via indices: {indices}")
     
     # 2. Load Data
     train_files = sorted(list((tw_dir / "train").glob("*.npz")))
@@ -139,21 +140,51 @@ def main():
         
     all_pos, all_force, all_energy, all_traj = [], [], [], []
     
+    dropped_frames = 0
+    total_frames = 0
+    FREQ = 100
+    
     for i, npz in enumerate(npz_files):
         d = np.load(npz)
         pos = d['positions'] # [T, 22, 3]
         frc = d['forces']     # [T, 22, 3]
+        ene = d['energies'][:, 0] # [T]
         
         # Select atoms
         pos = pos[:, indices, :]
         frc = frc[:, indices, :]
         
+        # Filter Outliers (Force Magnitude > 5000)
+        # Calculate max force norm per frame
+        force_norms = np.linalg.norm(frc, axis=-1) # [T, N_atoms]
+        max_f = force_norms.max(axis=-1) # [T]
+        
+        mask = max_f < 5000.0
+        
+        n_drop = (~mask).sum()
+        dropped_frames += n_drop
+        total_frames += len(mask)
+        
+        if n_drop > 0 and i % FREQ == 0:
+            log.info(f"File {i}: Dropped {n_drop}/{len(mask)} frames with force > 5000")
+
+        pos = pos[mask]
+        frc = frc[mask]
+        ene = ene[mask]
+        
+        if len(pos) == 0:
+            continue
+            
         all_pos.append(torch.from_numpy(pos).float())
         all_force.append(torch.from_numpy(frc).float())
-        
-        ene = d['energies'][:, 0] # [T]
         all_energy.append(torch.from_numpy(ene).float())
         all_traj.append(torch.full((pos.shape[0],), i, dtype=torch.long))
+
+    log.info(f"Total processed frames: {total_frames}")
+    log.info(f"Total dropped frames: {dropped_frames} ({dropped_frames/total_frames*100:.2f}%)")
+
+    if len(all_pos) == 0:
+        raise ValueError("No frames left after filtering!")
 
     cat_pos = torch.cat(all_pos, dim=0)
     cat_frc = torch.cat(all_force, dim=0)
