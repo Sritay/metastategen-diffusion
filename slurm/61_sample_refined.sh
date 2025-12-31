@@ -63,7 +63,7 @@ singularity exec --cleanenv \
       --n-samples 2000 \
       --batch-size 200 \
       --refinement-steps 200 \
-      --step-size 1e-4 \
+      --step-size 1e-7 \
       --temperature 0 \
       --out-dir runs/loop_b_final
   "

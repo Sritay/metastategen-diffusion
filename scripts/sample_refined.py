@@ -76,7 +76,7 @@ def main():
     # Or 'final.pt'. Active Learning loop might not verify/save 'best' in standard way, but 'iter_03' has 'eval_samples.pt'.
     # The models are in 'runs/day8_9_al_3/iter_03/model.pt' usually.
     parser.add_argument("--diff-config", type=str, default="configs/ala2_al_3.yaml")
-    parser.add_argument("--diff-ckpt", type=str, default="runs/day8_9_al_3/iter_03/model.pt") 
+    parser.add_argument("--diff-ckpt", type=str, default="runs/day8_9_al_3/members/m000/checkpoints/iter_03.pt") 
     
     # Force args
     parser.add_argument("--force-ckpt", type=str, default="runs/energy_pairwise/best_model.pt")
@@ -142,7 +142,7 @@ def main():
         shape = (B, 10, 3)
         
         with torch.no_grad():
-            x_10 = diffusion.sample(diff_model, shape, a_batch)
+            x_10 = diffusion.p_sample_loop(diff_model, shape, a_batch)
             
         # B. Reconstruction (10 -> 22)
         x_22 = align_and_reconstruct(x_10, templ_all, heavy_indices)
