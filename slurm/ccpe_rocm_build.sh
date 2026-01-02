@@ -14,7 +14,7 @@ export OMP_NUM_THREADS=1
 module use /work/y07/shared/archer2-lmod/others/dev
 module load ccpe/23.12/rocm/5.6.0
 
-cd /work/<...>/metastategen-diffusion
+cd /work/e760/e760/sritay/2_metastategen-diffusion
 
 echo "Host: $(hostname)"
 echo "PWD:  $(pwd)"

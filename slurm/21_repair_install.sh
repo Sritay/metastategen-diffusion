@@ -12,7 +12,7 @@ set -euo pipefail
 module use /work/y07/shared/archer2-lmod/others/dev
 module load ccpe/23.12/rocm/5.6.0
 
-cd /work/e760/e760/sritay/metastategen-diffusion
+cd /work/e760/e760/sritay/2_metastategen-diffusion
 
 # Bind logic
 build_bind_list () {

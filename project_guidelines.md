@@ -32,9 +32,9 @@ We strictly separate the sources for generic sampling vs. force training due to 
     *   **Units:** Verified as **Nanometers** (consistent with MDShare).
     *   **Atom Count Strategy (CRITICAL UPDATE):**
         *   **Diffusion Model:** Operates on **10 heavy atoms** (mdshare data).
-        *   **Force Surrogate:** Operates on **All 22 atoms** (Timewarp data).
+        *   **Pairwise Surrogate:** Operates on **All 22 atoms** (Timewarp data).
         *   **Reason:** Forces on heavy atoms are physically dependent on Hydrogen positions. Training on 10 atoms creates "noised" forces and instability.
-        *   **Bridge:** To refine a diffusion sample, we must **reconstruct Hydrogens** (e.g., using `pdbfixer` or geometric generic placement) before passing it to the Force Surrogate.
+        *   **Bridge:** To refine a diffusion sample, we must **reconstruct Hydrogens** (e.g., using `pdbfixer` or geometric generic placement) before passing it to the Pairwise Surrogate.
     *   **Refinement Strategy:** Use `scripts/process_timewarp.py` with `force_heavy_only=False`. We train the surrogate on the full physical system.
 
 ### 2.3 Dependency Constraints
@@ -59,7 +59,7 @@ We strictly separate the sources for generic sampling vs. force training due to 
 ### Week 2: "Almost Adoptable" (Forces & Refinement)
 *   **Focus:** Physics compliance & Active Learning.
 *   **Current Active Tasks:**
-    1.  **Force Surrogate:** Train an equivariant implementation (e.g., EGNN) to predict forces.
+    1.  **Pairwise Surrogate:** Train an MLP to predict pairwise forces.
     2.  **Guided Refinement:** Use the surrogate to run Langevin dynamics on diffusion samples ($x_{t+1} = x_t + \eta \nabla E + \dots$).
     3.  **Active Learning Loop:**
         *   Start with a "Weak Learner" (tiny % of data).

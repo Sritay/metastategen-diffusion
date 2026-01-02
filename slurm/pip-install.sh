@@ -5,7 +5,7 @@ set -euo pipefail
 python -m pip install --upgrade pip setuptools wheel
 
 # Core scientific stack (keep minimal; numpy<2 for torch 2.2 builds)
-python -m pip install "numpy<2" scipy matplotlib pyyaml tqdm rich mdshare
+python -m pip install "numpy<2" scipy matplotlib pyyaml tqdm rich mdshare pandas wandb
 
 # ROCm 5.6 wheels for PyTorch 2.2 (as in your guide snippet)
 python -m pip install \

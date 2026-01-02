@@ -11,7 +11,7 @@ module use /work/y07/shared/archer2-lmod/others/dev
 module load ccpe/23.12/rocm/5.6.0
 module load cray-python
 
-cd /work/e760/e760/sritay/metastategen-diffusion
+cd /work/e760/e760/sritay/2_metastategen-diffusion
 
 build_bind_list () {
   local raw="$1"
