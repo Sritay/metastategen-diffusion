@@ -1,4 +1,4 @@
-Directory tree for: /mnt/lustre/a2fs-work3/work/e760/e760/sritay/metastategen-diffusion/src
+Directory tree for: /mnt/lustre/a2fs-work3/work/e760/e760/sritay/2_metastategen-diffusion/src
 [drwxr-xr-x sritay   e760       4.0K Dec 25 11:18] ├── metastategen
 [-rw-r--r-- sritay   e760      49.0B Dec 24 22:25] │   ├── __init__.py
 [drwxr-xr-x sritay   e760       4.0K Dec 25 12:22] │   ├── __pycache__
