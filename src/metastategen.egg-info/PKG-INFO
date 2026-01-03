@@ -15,4 +15,6 @@ Requires-Dist: torch
 Requires-Dist: tqdm
 Requires-Dist: rich
 Requires-Dist: mdshare
+Requires-Dist: pandas
+Requires-Dist: wandb
 Dynamic: license-file

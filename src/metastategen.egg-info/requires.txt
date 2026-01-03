@@ -6,3 +6,5 @@ torch
 tqdm
 rich
 mdshare
+pandas
+wandb

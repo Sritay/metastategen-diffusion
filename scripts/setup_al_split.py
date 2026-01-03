@@ -111,22 +111,36 @@ def main() -> int:
 
     traj_id = full["traj_id"]
     seed_idx_all = torch.where(traj_id == seed_traj)[0]
-    val_idx_all = torch.where(traj_id == val_traj)[0]
+    
+    if val_traj == -1:
+        val_idx_all = torch.arange(n_total, dtype=torch.long)
+    else:
+        val_idx_all = torch.where(traj_id == val_traj)[0]
 
     if seed_size > seed_idx_all.shape[0]:
         raise ValueError(f"seed_size {seed_size} > available traj {seed_traj} frames {seed_idx_all.shape[0]}")
-    if val_size > val_idx_all.shape[0]:
-        raise ValueError(f"val_size {val_size} > available traj {val_traj} frames {val_idx_all.shape[0]}")
 
     seed_idx = seed_idx_all[:seed_size]
+
+    # Filter val candidates to exclude seed frames
+    # Create a mask of all candidates
+    candidate_mask = torch.zeros(n_total, dtype=torch.bool)
+    candidate_mask[val_idx_all] = True
+    candidate_mask[seed_idx] = False
+    
+    val_candidates = torch.where(candidate_mask)[0]
+
+    if val_size > val_candidates.shape[0]:
+        raise ValueError(f"val_size {val_size} > available frames {val_candidates.shape[0]} (after excluding seed)")
 
     if val_size == 0:
         val_idx = torch.empty(0, dtype=torch.long)
     elif args.val_sequential and not args.val_random:
-        val_idx = val_idx_all[:val_size]
+        # Note: 'sequential' might be jumping across trajectories if val_traj=-1
+        val_idx = val_candidates[:val_size]
     else:
-        perm = torch.randperm(val_idx_all.shape[0])
-        val_idx = val_idx_all[perm[:val_size]]
+        perm = torch.randperm(val_candidates.shape[0])
+        val_idx = val_candidates[perm[:val_size]]
 
     mask = torch.ones(n_total, dtype=torch.bool)
     mask[seed_idx] = False

@@ -1,11 +1,12 @@
 #!/bin/bash
 #SBATCH --job-name=ccpe-rocm-build
 #SBATCH --ntasks=8
-#SBATCH --time=00:20:00
-#SBATCH --account=<account_name>
+#SBATCH --time=00:50:00
+#SBATCH --account=e760
 #SBATCH --partition=serial
 #SBATCH --qos=serial
 #SBATCH --export=none
+#SBATCH --mem=10G
 
 set -euo pipefail
 export OMP_NUM_THREADS=1

@@ -54,8 +54,18 @@ def compute_phi_psi(samples_path: Path, pdb_path: Path):
     return degs.cpu().numpy()
 
 def main():
-    root_dir = Path("runs/day8_9_al_3")
-    iters = [0, 1, 2, 3]
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--run", type=str, default="runs/day10_al_5_hpc")
+    args = parser.parse_args()
+    
+    root_dir = Path(args.run)
+    if not root_dir.exists():
+        print(f"Run directory not found: {root_dir}")
+        return
+
+    # Plot Iter 0 (Init), 3 (Early), 6 (Mid), 10 (Final)
+    iters = [0, 3, 6, 10]
     pdb_path = Path("/Users/sritaymistry/projects/metastategen-diffusion/data/raw/alanine-dipeptide-nowater.pdb")
     
     fig, axes = plt.subplots(1, 4, figsize=(20, 5), sharex=True, sharey=True)

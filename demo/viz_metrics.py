@@ -3,7 +3,12 @@ import matplotlib.pyplot as plt
 from pathlib import Path
 
 def main():
-    path = Path("runs/day8_9_al_3/al_metrics.csv")
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--run", type=str, default="runs/day10_al_5_hpc")
+    args = parser.parse_args()
+
+    path = Path(args.run) / "al_metrics.csv"
     if not path.exists():
         print("Metrics file not found.")
         return
@@ -29,9 +34,16 @@ def main():
         axes[1].set_ylabel("KL Divergence")
     
     plt.suptitle("Active Learning Performance Metrics")
-    out_file = Path("demo") / "learning_curves.png"
-    plt.savefig(out_file, dpi=150)
-    print(f"Saved {out_file}")
+    
+    # Save PNG
+    out_file_png = Path("demo") / "learning_curves.png"
+    plt.savefig(out_file_png, dpi=150)
+    print(f"Saved {out_file_png}")
+
+    # Save PDF
+    out_file_pdf = Path("demo") / "learning_curves.pdf"
+    plt.savefig(out_file_pdf, dpi=300, format='pdf')
+    print(f"Saved {out_file_pdf}")
 
 if __name__ == "__main__":
     main()
