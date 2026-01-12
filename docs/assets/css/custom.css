@@ -1,17 +1,29 @@
 /* Custom CSS to override Just the Docs theme */
 
-/* Sidebar background color - make it light/soft grey */
+/* Sidebar background color - Force Light Grey */
 .side-bar {
-    background-color: #f8f9fa !important; /* Light grey */
+    background-color: #f8f9fa !important;
     border-right: 1px solid #e9ecef;
 }
 
-/* Ensure text contrast in sidebar if needed */
-.nav-list .nav-list-item .nav-list-link {
-    color: #495057;
+/* Fix text colors for contrast against light background */
+/* Default theme (dark usually) puts white text. We need dark text for light sidebar. */
+.site-title {
+    color: #343a40 !important;
 }
 
+.nav-list .nav-list-item .nav-list-link {
+    color: #495057 !important;
+}
+
+.nav-list .nav-list-item .nav-list-link:hover,
 .nav-list .nav-list-item .nav-list-link.active {
-    color: #007bff; /* Active link color */
-    font-weight: 600;
+    color: #007bff !important;
+    background-image: none;
+    /* Remove default gradient if any */
+}
+
+/* Ensure the main content doesn't bleed */
+.site-footer {
+    color: #6c757d;
 }

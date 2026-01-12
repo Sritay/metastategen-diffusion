@@ -2,21 +2,22 @@
 <link rel="stylesheet" href="{{ '/assets/css/custom.css' | relative_url }}">
 
 <!-- MathJax Configuration -->
-<script type="text/javascript">
+<script>
   window.MathJax = {
     tex: {
-      packages: ['base', 'ams']
+      inlineMath: [['$', '$'], ['\\(', '\\)']],
+      displayMath: [['$$', '$$'], ['\\[', '\\]']],
+      processEscapes: true,
+      packages: ['base', 'ams', 'noerrors', 'noundefined']
+    },
+    options: {
+      ignoreHtmlClass: 'tex2jax_ignore',
+      processHtmlClass: 'tex2jax_process'
     },
     loader: {
-      load: ['ui/menu', '[tex]/ams']
-    },
-    startup: {
-      ready: () => {
-        MathJax.startup.defaultReady();
-      }
+      load: ['[tex]/noerrors', '[tex]/noundefined']
     }
   };
 </script>
-<script type="text/javascript" id="MathJax-script" async
-  src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js">
+<script type="text/javascript" id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js">
 </script>
