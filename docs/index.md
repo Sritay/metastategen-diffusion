@@ -5,20 +5,39 @@ Welcome to the **MetaStateGen Diffusion** project documentation.
 ## Project Goal
 This project aims to generate physically valid, low-energy metastable states of peptides (focusing on Alanine Dipeptide) using a novel **Active Learning + Diffusion** approach.
 
-We combine:
-1.  **Geometric Deep Learning (EGNN)** for capturing molecular symmetries.
-2.  **Denoising Diffusion Probabilistic Models (DDPM)** for generative sampling.
-3.  **Active Learning Loops** to iteratively explore the conformational landscape.
-4.  **Physics-Guided Refinement** to relax generated structures into true energy minima.
+We combine **Geometric Deep Learning (EGNN)** for capturing molecular symmetries with **Active Learning** to iteratively explore the conformational landscape.
 
-## Key Features
--   **Active Learning**: The model learns from its own uncertainty, querying an "Oracle" (Ground Truth MD) to label high-uncertainty regions.
--   **Two-Stage Generation**:
-    1.  **Diffusion (Backbone)**: Generates the coarse 10-atom backbone structure.
-    2.  **Refinement (All-Atom)**: Reconstructs the 22-atom system and relaxes it using a learned Pairwise Force Field.
--   **Chirality Awareness**: explicit geometric features to distinguish between enantiomers (L-Ala vs D-Ala).
+---
 
-## Navigate
--   [Methodology](./methodology.md): How the Active Learning and Refinement loops work.
--   [Implementation](./implementation.md): Details on Model Architecture, Datasets, and constraints.
--   [Usage](./usage.md): Instructions for running training and sampling.
+## 📚 Documentation Contents
+
+### [1. Methodology](methodology.md)
+*   **Active Learning Loop**: How we iteratively train the ensemble.
+*   **Refinement Loop**: How we convert backbones to full atoms.
+*   **Scripts**: Detailed breakdown of `run_al_loop.py` and `sample_refined.py`.
+
+### [2. Implementation Details](implementation.md)
+*   **Model Architecture**: EGNN configurations and Hyperparameters.
+*   **Datasets**: MDShare vs Timewarp.
+*   **Design Decisions**: Why RBF? Why Constraints?
+
+### [3. Usage Guide](usage.md)
+*   **Installation**: Getting started.
+*   **Running Training**: How to launch SLURM jobs.
+*   **Running Sampling**: Generating your own structures.
+
+---
+
+## Quick Overview
+
+### The Problem
+Molecular Dynamics (MD) is expensive. We want to generate diverse, low-energy molecular states without running simulation for weeks.
+
+### The Solution
+1.  **Backbone Diffusion**: A diffusion model learns to generate the heavy-atom backbone roughly.
+2.  **Active Learning**: We don't just train once. We train, generate, find uncertainty, label it, and retrain. This pushes the model into new regions.
+3.  **Refinement**: We use a fast surrogate model (Pairwise Force Field) to relax the rough backbones into perfect physical structures.
+
+---
+
+[Next: Methodology >](methodology.md)
