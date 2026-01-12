@@ -1,0 +1,4 @@
+theme: jekyll-theme-slate
+title: MetaStateGen Diffusion
+description: Generating metastable molecular states with diffusion and active learning.
+show_downloads: true
