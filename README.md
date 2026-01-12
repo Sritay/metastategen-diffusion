@@ -28,15 +28,33 @@ This project implements a "Physics-Compliant" diffusion model for generating met
 
 ## Usage
 
-### Training Diffusion
+### 1. Core Workflows (Scripts)
+The primary workflows are currently run via python scripts:
+
+**Training:**
 ```bash
 python scripts/train_diffusion.py --config configs/ala2_default.yaml
 ```
 
-### Sampling & Refinement
+**Active Learning Loop:**
+```bash
+python scripts/run_al_loop.py --config configs/ala2_al.yaml
+```
+
+**Sampling & Refinement:**
 ```bash
 python scripts/sample_refined.py --diff-ckpt runs/best_model.pt --force-ckpt runs/energy_model.pt
 ```
+
+### 2. CLI (Reporting)
+Installing the package (`pip install -e .`) provides the `msgen` command line tool. Currently, this is used for generating evaluation reports:
+
+```bash
+# Generate Reference Plots
+msgen report --dihedrals data/processed/ala2/dihedrals.npz --outdir reports/reference
+```
+
+*(Note: `train`, `sample`, and `al` subcommands are reserved for future CLI integration.)*
 
 ## Structure
 
