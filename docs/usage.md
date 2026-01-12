@@ -6,7 +6,8 @@
 
 ## Prerequisites
 *   **OS**: Linux (tested on RHEL/CentOS via HPC).
-*   **Hardware**: Capable CPU or standard consumer GPU. Use of HPC/A100 is optional (Diffusion model is small, ~1M parameters).
+*   **Hardware**: Capable CPU or standard consumer GPU.
+    *   *Note*: The project was developed and tested on **Archer2 HPC** using **AMD MI210 GPUs** with **ROCm 5.6.0**. Use of HPC is optional as the model is lightweight (~1M parameters).
 *   **Software**: Python 3.10+, PyTorch 2.0+.
 
 ## Installation
