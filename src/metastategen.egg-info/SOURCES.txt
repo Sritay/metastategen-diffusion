@@ -36,6 +36,8 @@ src/metastategen/utils/geometry.py
 src/metastategen/utils/logging.py
 src/metastategen/utils/pdb.py
 src/metastategen/utils/seed.py
-tests/test_chirality.py
-tests/test_geometry_fixes.py
+src/metastategen/workflows/__init__.py
+src/metastategen/workflows/active_learning.py
+src/metastategen/workflows/sampling.py
+src/metastategen/workflows/train.py
 tests/test_integration.py

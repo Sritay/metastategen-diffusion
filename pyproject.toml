@@ -7,7 +7,7 @@ name = "metastategen"
 version = "0.1.0"
 description = "Metastable state generation with equivariant diffusion (Day-1: data + eval pipeline)."
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.8"
 license = {text = "MIT"}
 authors = [{name = "metastategen-diffusion contributors"}]
 dependencies = [

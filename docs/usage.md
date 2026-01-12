@@ -1,6 +1,13 @@
+---
+layout: default
+title: Usage Guide
+nav_order: 5
+math: mathjax
+---
+
 # Usage Guide
 
-[< Back to Implementation](implementation.md) | [Back to Home >](index.md)
+[< Back: Implementation](implementation.md) | [Back to Home >](index.md)
 
 ---
 
@@ -60,4 +67,4 @@ sbatch slurm/93_refine_loop_23_fixed.sh
 
 ---
 
-[< Back to Implementation](implementation.md) | [Back to Home >](index.md)
+[< Back: Implementation](implementation.md) | [Back to Home >](index.md)

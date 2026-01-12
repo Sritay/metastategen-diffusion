@@ -7,8 +7,10 @@ from metastategen.eval.ramachandran import load_phi_psi_npz, plot_ramachandran_d
 from metastategen.eval.free_energy import (
     prob_from_phi_psi,
     free_energy_from_prob,
+    free_energy_from_prob,
     plot_free_energy,
 )
+from metastategen.workflows import run_training, run_active_learning, run_sampling
 
 log = get_logger("msgen")
 
@@ -44,6 +46,27 @@ def _cmd_report(args: argparse.Namespace) -> int:
     log.info(f"Wrote: {fe_png}")
     return 0
 
+def _cmd_train(args: argparse.Namespace) -> int:
+    return run_training(config_path=args.config)
+
+def _cmd_al(args: argparse.Namespace) -> int:
+    return run_active_learning(config_path=args.config)
+
+def _cmd_sample(args: argparse.Namespace) -> int:
+    return run_sampling(
+        diff_config=args.diff_config,
+        diff_ckpt=args.diff_ckpt,
+        force_ckpt=args.force_ckpt,
+        out_dir=args.out_dir,
+        n_samples=args.n_samples,
+        batch_size=args.batch_size,
+        refinement_steps=args.refinement_steps,
+        step_size=args.step_size,
+        warmup_steps=args.warmup_steps,
+        keep_percent=args.keep_percent,
+        seed=args.seed
+    )
+
 def _not_impl(_: argparse.Namespace, name: str) -> int:
     log.error(f"Subcommand '{name}' is not implemented in Day-1.")
     return 2
@@ -65,12 +88,30 @@ def build_parser() -> argparse.ArgumentParser:
     pr.set_defaults(func=_cmd_report)
 
     # placeholders
-    pt = sub.add_parser("train", help="(placeholder) Train diffusion model")
-    pt.set_defaults(func=lambda a: _not_impl(a, "train"))
-    ps = sub.add_parser("sample", help="(placeholder) Sample from diffusion model")
-    ps.set_defaults(func=lambda a: _not_impl(a, "sample"))
-    pa = sub.add_parser("al", help="(placeholder) Active learning loop")
-    pa.set_defaults(func=lambda a: _not_impl(a, "al"))
+    # train
+    pt = sub.add_parser("train", help="Train diffusion model")
+    pt.add_argument("--config", type=str, default="configs/ala2_default.yaml")
+    pt.set_defaults(func=_cmd_train)
+
+    # sample
+    ps = sub.add_parser("sample", help="Sample and refine structures")
+    ps.add_argument("--diff-config", type=str, default="configs/ala2_al_3.yaml")
+    ps.add_argument("--diff-ckpt", type=str, default="runs/day8_9_al_3/members/m000/checkpoints/iter_03.pt")
+    ps.add_argument("--force-ckpt", type=str, default="runs/energy_pairwise/best_model.pt")
+    ps.add_argument("--out-dir", type=str, default="runs/loop_b_refinement")
+    ps.add_argument("--n-samples", type=int, default=100)
+    ps.add_argument("--batch-size", type=int, default=100)
+    ps.add_argument("--refinement-steps", type=int, default=2000)
+    ps.add_argument("--step-size", type=float, default=1e-5)
+    ps.add_argument("--warmup-steps", type=int, default=1000)
+    ps.add_argument("--keep-percent", type=float, default=1.0)
+    ps.add_argument("--seed", type=int, default=42)
+    ps.set_defaults(func=_cmd_sample)
+
+    # al
+    pa = sub.add_parser("al", help="Run active learning loop")
+    pa.add_argument("--config", type=str, default="configs/ala2_al.yaml")
+    pa.set_defaults(func=_cmd_al)
 
     return p
 

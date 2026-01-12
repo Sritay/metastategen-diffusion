@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import argparse
 import csv
 import time
 from pathlib import Path
@@ -12,7 +11,7 @@ import yaml
 from metastategen.active_learning import select_acquisition
 try:
     from metastategen.data import ALDataManager, load_al_data
-except ImportError:  # Fallback for older package exports.
+except ImportError:  # Fallback
     from metastategen.data.manager import ALDataManager, load_al_data
 from metastategen.eval.coverage import kl_from_phi_psi
 from metastategen.eval.rmsd import greedy_cluster, rmsd_kabsch
@@ -382,12 +381,8 @@ def _evaluate(
     }
 
 
-def main() -> int:
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--config", type=str, default="configs/ala2_al.yaml")
-    args = ap.parse_args()
-
-    with open(args.config, "r") as f:
+def run_active_learning(config_path: str) -> int:
+    with open(config_path, "r") as f:
         cfg = yaml.safe_load(f)
 
     al_cfg = cfg.get("active_learning", {})
@@ -684,7 +679,3 @@ def main() -> int:
 
     log.info("AL loop complete. Metrics: %s", metrics_path)
     return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())

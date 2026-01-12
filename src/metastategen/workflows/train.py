@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 import argparse
+import sys
 import yaml
 import torch
 import torch.nn as nn
@@ -13,12 +16,8 @@ from metastategen.models.diffusion import GaussianDiffusion, DiffusionConfig
 
 log = get_logger("train")
 
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--config", type=str, default="configs/ala2_day2.yaml")
-    args = parser.parse_args()
-
-    with open(args.config, 'r') as f:
+def run_training(config_path: str):
+    with open(config_path, 'r') as f:
         cfg = yaml.safe_load(f)
 
     set_deterministic(cfg['train']['seed'])
@@ -119,6 +118,4 @@ def main():
     final_path = ckpt_dir / "final.pt"
     torch.save(model.state_dict(), final_path) # Just weights for easier loading
     log.info("Done.")
-
-if __name__ == "__main__":
-    main()
+    return 0

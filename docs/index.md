@@ -1,4 +1,16 @@
+---
+layout: default
+title: Home
+nav_order: 1
+has_children: false
+math: mathjax
+---
+
 # MetaStateGen Diffusion
+
+[Next: Active Learning >](active_learning.md)
+
+---
 
 Welcome to the **MetaStateGen Diffusion** project documentation.
 
@@ -11,20 +23,23 @@ We combine **Geometric Deep Learning (EGNN)** for capturing molecular symmetries
 
 ## 📚 Documentation Contents
 
-### [1. Methodology](methodology.md)
-*   **Active Learning Loop**: How we iteratively train the ensemble.
-*   **Refinement Loop**: How we convert backbones to full atoms.
-*   **Scripts**: Detailed breakdown of `run_al_loop.py` and `sample_refined.py`.
+### [1. Active Learning Loop](active_learning.md)
+*   **Ensemble Training**: Diversity through random seeds.
+*   **Acquisition**: Using uncertainty (variance) to find new states.
+*   **Oracle**: Snapping hallucinated candidates to valid ground truth.
 
-### [2. Implementation Details](implementation.md)
-*   **Model Architecture**: EGNN configurations and Hyperparameters.
+### [2. Refinement Loop](refinement.md)
+*   **Reconstruction**: Converting 10-atom backbones to 22-atom all-atom structures.
+*   **Geometric Correction**: Using bond constraints and warm-up.
+*   **Energy Relaxation**: Using the Pairwise Force Field.
+
+### [3. Implementation Details](implementation.md)
+*   **Model Architecture**: EGNN configurations, Chirality, and Pairwise RBFs.
 *   **Datasets**: MDShare vs Timewarp.
-*   **Design Decisions**: Why RBF? Why Constraints?
 
-### [3. Usage Guide](usage.md)
+### [4. Usage Guide](usage.md)
 *   **Installation**: Getting started.
-*   **Running Training**: How to launch SLURM jobs.
-*   **Running Sampling**: Generating your own structures.
+*   **Running**: SLURM commands for training and sampling.
 
 ---
 
@@ -40,4 +55,4 @@ Molecular Dynamics (MD) is expensive. We want to generate diverse, low-energy mo
 
 ---
 
-[Next: Methodology >](methodology.md)
+[Next: Active Learning >](active_learning.md)

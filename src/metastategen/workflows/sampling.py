@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import argparse
 import yaml
 import torch
@@ -98,46 +100,34 @@ def constrain_bonds_22(x):
             x[:, i2] += 0.5 * delta
     return x
 
-def main():
-    parser = argparse.ArgumentParser()
-    
-    # Diffusion args
-    # Using the designated best checkpoint from Loop 3 for refinement.
-    parser.add_argument("--diff-config", type=str, default="configs/ala2_al_3.yaml")
-    parser.add_argument("--diff-ckpt", type=str, default="runs/day8_9_al_3/members/m000/checkpoints/iter_03.pt") 
-    
-    # Force args
-    parser.add_argument("--force-ckpt", type=str, default="runs/energy_pairwise/best_model.pt")
-    
-    # Sampling args
-    parser.add_argument("--n-samples", type=int, default=100)
-    parser.add_argument("--batch-size", type=int, default=100)
-    parser.add_argument("--refinement-steps", type=int, default=2000)
-    parser.add_argument("--step-size", type=float, default=1e-5) # Reduced for stability
-    parser.add_argument("--temperature", type=float, default=298.0) 
-    
-    # Note: Step size 1e-5 is conservative (based on normalized units).
-    
-    parser.add_argument("--out-dir", type=str, default="runs/loop_b_refinement")
-    parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--warmup-steps", type=int, default=1000, help="Initial steps before energy filtering")
-    parser.add_argument("--keep-percent", type=float, default=1.0, help="Fraction of samples to keep (0.0 < p <= 1.0)")
-    
-    args = parser.parse_args()
-    set_deterministic(args.seed)
+def run_sampling(
+    diff_config: str,
+    diff_ckpt: str,
+    force_ckpt: str,
+    out_dir: str,
+    n_samples: int = 100,
+    batch_size: int = 100,
+    refinement_steps: int = 2000,
+    step_size: float = 1e-5,
+    temperature: float = 298.0,
+    seed: int = 42,
+    warmup_steps: int = 1000,
+    keep_percent: float = 1.0,
+):
+    set_deterministic(seed)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     log.info(f"Device: {device}")
     
     # Ensure output directory exists
-    Path(args.out_dir).mkdir(parents=True, exist_ok=True)
+    Path(out_dir).mkdir(parents=True, exist_ok=True)
 
     # 1. Load Diffusion
     # Load model using standard config keys.
-    diff_model, diffusion, diff_cfg = load_diffusion_model(Path(args.diff_config), Path(args.diff_ckpt), device)
+    diff_model, diffusion, diff_cfg = load_diffusion_model(Path(diff_config), Path(diff_ckpt), device)
     diff_model.eval()
     
     # 2. Load Pairwise Force
-    force_model, f_stats = load_pairwise_model(Path(args.force_ckpt), device)
+    force_model, f_stats = load_pairwise_model(Path(force_ckpt), device)
     force_model.eval()
     
     # 3. Setup Template for Reconstruction
@@ -159,12 +149,11 @@ def main():
     diff_types = torch.load(shard_path)['atom_types'].to(device) # [10]
 
     all_samples = []
-    all_samples = []
     # Adjust n_batches: If filtering, we process input batch size fully, then reduce.
-    # We still loop based on 'args.n_samples' which we treat as INPUT samples count for generation.
-    n_batches = (args.n_samples + args.batch_size - 1) // args.batch_size
+    # We still loop based on 'n_samples' which we treat as INPUT samples count for generation.
+    n_batches = (n_samples + batch_size - 1) // batch_size
     
-    log.info(f"Generating {args.n_samples} samples...")
+    log.info(f"Generating {n_samples} samples...")
     
     initial_samples = []
     refined_samples = []
@@ -172,7 +161,7 @@ def main():
     for i in range(n_batches):
         # Determine current batch size (might be smaller for last batch)
         
-        B = min(args.batch_size, args.n_samples - (i * args.batch_size))
+        B = min(batch_size, n_samples - (i * batch_size))
         if B <= 0: break
         
         # A. Diffusion
@@ -192,8 +181,8 @@ def main():
         # C. Warmup Phase
         x_curr = x_22.clone().to(device).requires_grad_(True)
         
-        warmup_k = args.warmup_steps
-        main_k = args.refinement_steps - warmup_k
+        warmup_k = warmup_steps
+        main_k = refinement_steps - warmup_k
         
         if warmup_k > 0:
             log.info(f"Batch {i+1}: Warmup ({warmup_k} steps)...")
@@ -207,25 +196,25 @@ def main():
                 f_pred = f_pred * clip_coef
 
                 with torch.no_grad():
-                    x_curr.data += args.step_size * f_pred
+                    x_curr.data += step_size * f_pred
                     x_curr.data = constrain_bonds_22(x_curr.data)
 
         # D. Filtering
-        if args.keep_percent < 1.0:
+        if keep_percent < 1.0:
             with torch.no_grad():
                 # Calc energy for filtering
                 e_vals = force_model(x_curr) * f_stats['e_std'] + f_stats['e_mean'] # Denormalized for logging? No, model returns norm.
                 # Just use e_norm for sorting
                 e_norm = force_model(x_curr)
                 
-                k_keep = int(B * args.keep_percent)
+                k_keep = int(B * keep_percent)
                 k_keep = max(1, k_keep) # Keep at least 1
                 
                 # Sort
                 vals, indices = torch.sort(e_norm)
                 keep_idx = indices[:k_keep]
                 
-                log.info(f"Batch {i+1}: Filtering top {args.keep_percent*100}% ({B} -> {k_keep}). Best E={vals[0].item():.2f}, Worst kept={vals[k_keep-1].item():.2f}")
+                log.info(f"Batch {i+1}: Filtering top {keep_percent*100}% ({B} -> {k_keep}). Best E={vals[0].item():.2f}, Worst kept={vals[k_keep-1].item():.2f}")
                 
                 # Filter x_curr
                 x_curr = x_curr[keep_idx].detach().clone().requires_grad_(True)
@@ -245,7 +234,7 @@ def main():
                 if i == 0 and (k < 5 or k % 5000 == 0 or k == main_k - 1):
                      log.info(f"Main Step {k}: E_norm={e_norm.mean().item():.2f} | Force_norm_pre={f_norm.mean().item():.2f}")
                 
-                x_curr.data += args.step_size * f_pred
+                x_curr.data += step_size * f_pred
                 x_curr.data = constrain_bonds_22(x_curr.data)
                     
         refined_samples.append(x_curr.detach().cpu())
@@ -257,7 +246,7 @@ def main():
                 "refined_positions": torch.cat(refined_samples, dim=0),
                 "atom_types": diff_types.cpu()
             }
-            ckpt_path = Path(args.out_dir) / f"checkpoint_batch_{i+1:03d}.pt"
+            ckpt_path = Path(out_dir) / f"checkpoint_batch_{i+1:03d}.pt"
             torch.save(ckpt_data, ckpt_path)
             log.info(f"Saved checkpoint to {ckpt_path}")
         
@@ -267,10 +256,8 @@ def main():
         "atom_types": diff_types.cpu()
     }
     
-    out_path = Path(args.out_dir) / "refined_results.pt"
+    out_path = Path(out_dir) / "refined_results.pt"
     out_path.parent.mkdir(parents=True, exist_ok=True)
     torch.save(results, out_path)
     log.info(f"Saved refined results to {out_path}")
-
-if __name__ == "__main__":
-    main()
+    return 0

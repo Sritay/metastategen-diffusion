@@ -30,3 +30,4 @@ demo/temp_*.py
 project_guidelines.md
 project_workflow.md
 LOCAL_DEV_NOTES.md
+*.egg-info

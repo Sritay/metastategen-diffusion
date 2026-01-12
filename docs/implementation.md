@@ -1,10 +1,17 @@
+---
+layout: default
+title: Implementation Details
+nav_order: 4
+math: mathjax
+---
+
 # Implementation Details
 
-[< Back to Methodology](methodology.md) | [Next: Usage >](usage.md)
-
-This section provides a deep technical dive into the model architectures, data structures, and constraints used in MetaStateGen.
+[< Back: Refinement Loop](refinement.md) | [Next: Usage >](usage.md)
 
 ---
+
+This section provides a deep technical dive into the model architectures, data structures, and constraints used in MetaStateGen.
 
 ## Datasets
 
@@ -65,4 +72,4 @@ This model acts as a differentiable "calculator" that predicts Energy given posi
 
 ---
 
-[< Back to Methodology](methodology.md) | [Next: Usage >](usage.md)
+[< Back: Refinement Loop](refinement.md) | [Next: Usage >](usage.md)

@@ -1,4 +1,8 @@
-theme: jekyll-theme-slate
+remote_theme: just-the-docs/just-the-docs
 title: MetaStateGen Diffusion
 description: Generating metastable molecular states with diffusion and active learning.
 show_downloads: true
+
+search_enabled: true
+aux_links:
+  "GitHub Repository": "https://github.com/Sritay/metastategen-diffusion"
