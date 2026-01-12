@@ -22,3 +22,8 @@ slurm/archive/
 # IDE
 .vscode/
 .idea/
+
+# Internal Documentation
+project_guidelines.md
+project_workflow.md
+LOCAL_DEV_NOTES.md
