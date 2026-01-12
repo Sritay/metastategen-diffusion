@@ -23,7 +23,7 @@ def main():
     
     args = parser.parse_args()
     
-    sys.exit(run_sampling(
+    return run_sampling(
         diff_config=args.diff_config,
         diff_ckpt=args.diff_ckpt,
         force_ckpt=args.force_ckpt,
@@ -36,7 +36,7 @@ def main():
         seed=args.seed,
         warmup_steps=args.warmup_steps,
         keep_percent=args.keep_percent
-    ))
+    )
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

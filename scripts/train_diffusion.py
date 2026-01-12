@@ -8,7 +8,7 @@ def main():
     parser.add_argument("--config", type=str, default="configs/ala2_default.yaml")
     args = parser.parse_args()
     
-    sys.exit(run_training(config_path=args.config))
+    return run_training(config_path=args.config)
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
