@@ -1,0 +1,17 @@
+/* Custom CSS to override Just the Docs theme */
+
+/* Sidebar background color - make it light/soft grey */
+.side-bar {
+    background-color: #f8f9fa !important; /* Light grey */
+    border-right: 1px solid #e9ecef;
+}
+
+/* Ensure text contrast in sidebar if needed */
+.nav-list .nav-list-item .nav-list-link {
+    color: #495057;
+}
+
+.nav-list .nav-list-item .nav-list-link.active {
+    color: #007bff; /* Active link color */
+    font-weight: 600;
+}

@@ -43,7 +43,7 @@ math: mathjax
 
 ## Running the Code
 
-You can run the project using either the modern CLI (`msgen`) or the legacy scripts (for existing SLURM workflows).
+You can run the project using either the **CLI** (`msgen`) or the **Scripts** (for existing SLURM workflows).
 
 ### Option A: Using the CLI (`msgen`)
 
@@ -78,7 +78,7 @@ msgen report --dihedrals data/processed/ala2/dihedrals.npz --outdir reports/my_r
 
 ---
 
-### Option B: Legacy Scripts (SLURM / HPC)
+### Option B: Python Scripts (SLURM / HPC)
 
 For compatibility with existing `slurm/*.sh` scripts, the original python scripts in the `scripts/` directory are maintained as wrappers. These function identically to the CLI commands.
 

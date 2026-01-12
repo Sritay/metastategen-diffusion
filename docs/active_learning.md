@@ -2,7 +2,6 @@
 layout: default
 title: Active Learning Loop
 nav_order: 2
-math: mathjax
 ---
 
 # Active Learning Loop (Backbone Generation)

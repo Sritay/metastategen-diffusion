@@ -6,3 +6,7 @@ show_downloads: true
 search_enabled: true
 aux_links:
   "GitHub Repository": "https://github.com/Sritay/metastategen-diffusion"
+
+kramdown:
+  math_engine: mathjax
+  input: GFM
