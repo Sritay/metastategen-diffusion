@@ -1,27 +1,24 @@
-# Python
+
 __pycache__/
-*.py[cod]
-*$py.class
+*.pyc
+.DS_Store
+.venv/
+env/
 
-# Environments
-mypyenv/
-venv/
-.env
-
-# Data and Artifacts
+# Data and Runs
 /data/
-!src/**/data/
-runs/
-*.pt
-*.npz
-*.pdb
+/runs/
+/wandb/
 
-# IDEs
+# Logs
+*.out
+*.err
+logs/
+
+# Archive
+scripts/archive/
+slurm/archive/
+
+# IDE
 .vscode/
 .idea/
-
-# SLURM logs
-slurm-*.out
-
-# System
-.DS_Store

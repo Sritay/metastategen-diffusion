@@ -1,0 +1,11 @@
+numpy<2
+scipy
+matplotlib
+pyyaml
+tqdm
+rich
+mdshare
+pandas
+wandb
+torch>=2.0
+torchvision

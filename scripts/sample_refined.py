@@ -101,12 +101,8 @@ def constrain_bonds_22(x):
 def main():
     parser = argparse.ArgumentParser()
     
-    # Diffusion args (Using Loop A / Loop 2 / Loop 3 checkpoint?)
-    # User said "Refinement is Loop B".
-    # We should use the BEST diffusion model so far.
-    # Loop 3 (Scientific Fix) was successful. 'runs/day8_9_al_3/iter_03/checkpoints/best.pt'?
-    # Or 'final.pt'. Active Learning loop might not verify/save 'best' in standard way, but 'iter_03' has 'eval_samples.pt'.
-    # The models are in 'runs/day8_9_al_3/iter_03/model.pt' usually.
+    # Diffusion args
+    # Using the designated best checkpoint from Loop 3 for refinement.
     parser.add_argument("--diff-config", type=str, default="configs/ala2_al_3.yaml")
     parser.add_argument("--diff-ckpt", type=str, default="runs/day8_9_al_3/members/m000/checkpoints/iter_03.pt") 
     
@@ -118,12 +114,9 @@ def main():
     parser.add_argument("--batch-size", type=int, default=100)
     parser.add_argument("--refinement-steps", type=int, default=2000)
     parser.add_argument("--step-size", type=float, default=1e-5) # Reduced for stability
-    parser.add_argument("--temperature", type=float, default=298.0) # Kelvin?
-    # Note: Training was on whatever units. If forces are ~1000, energies ~100.
-    # We normalized targets.
-    # f_pred = (normalized_grad * e_std).
-    # Step size 1e-4 depends on units.
-    # 1e-4 is defensive.
+    parser.add_argument("--temperature", type=float, default=298.0) 
+    
+    # Note: Step size 1e-5 is conservative (based on normalized units).
     
     parser.add_argument("--out-dir", type=str, default="runs/loop_b_refinement")
     parser.add_argument("--seed", type=int, default=42)
@@ -139,8 +132,7 @@ def main():
     Path(args.out_dir).mkdir(parents=True, exist_ok=True)
 
     # 1. Load Diffusion
-    # Note: al_3 yaml might have different structure than train_diffusion yaml.
-    # But loading relies on 'model' keys which are standard.
+    # Load model using standard config keys.
     diff_model, diffusion, diff_cfg = load_diffusion_model(Path(args.diff_config), Path(args.diff_ckpt), device)
     diff_model.eval()
     
@@ -179,9 +171,6 @@ def main():
     
     for i in range(n_batches):
         # Determine current batch size (might be smaller for last batch)
-        # Note: If we just want to process N input samples, we iterate standard way.
-        n_generated = len(initial_samples) # Currently stored 
-        # Wait, simplistic loop is fine. We generate batch, refine, filter, store.
         
         B = min(args.batch_size, args.n_samples - (i * args.batch_size))
         if B <= 0: break

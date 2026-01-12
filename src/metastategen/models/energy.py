@@ -71,10 +71,10 @@ class EnergyEGNN(nn.Module):
         # Typically for E(x), we just do invariant message passing on h, using distances from x.
         # If we update x, E becomes E(x_final(x)).
         
-        # Let's start with standard EGNN logic where we ALLOW latent coordinate updates if it helps,
-        # but the Energy is read out from the final H.
-        # Actually, simpler is: Use layers that ONLY update H (Invariant GNN).
-        # But our EGNNLayer updates both. Let's use it as is, it's fine.
+        # We use the standard EGNN layer which updates both features (h) and coordinates (x).
+        # While strictly an Energy model E(x) should be invariant to internal coordinate updates,
+        # allowing latent coordinate updates can increase expressivity. 
+        # The final energy is read out from the node features h.
         
         curr_x = x
         for layer in self.layers:

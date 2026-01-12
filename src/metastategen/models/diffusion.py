@@ -183,12 +183,7 @@ class GaussianDiffusion(nn.Module):
             # I should split the edits.
             pass
 
-# Wait, I cannot use "pass" in ReplacementContent. 
-# I will make 3 separate edits: 
-# 1. Add function.
-# 2. Edit p_sample_loop.
-# 3. Edit ddim_sample_loop.
-# This prevents accidentally deleting the class body.
+
 
         super().__init__()
         self.cfg = cfg

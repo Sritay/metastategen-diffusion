@@ -1,24 +1,3 @@
-Metadata-Version: 2.4
-Name: metastategen
-Version: 0.1.0
-Summary: Metastable state generation with equivariant diffusion (Day-1: data + eval pipeline).
-Author: metastategen-diffusion contributors
-License: MIT
-Requires-Python: >=3.10
-Description-Content-Type: text/markdown
-License-File: LICENSE
-Requires-Dist: numpy<2
-Requires-Dist: scipy
-Requires-Dist: matplotlib
-Requires-Dist: pyyaml
-Requires-Dist: torch
-Requires-Dist: tqdm
-Requires-Dist: rich
-Requires-Dist: mdshare
-Requires-Dist: pandas
-Requires-Dist: wandb
-Dynamic: license-file
-
 # MetaStateGen-Diffusion
 
 Metastable state generation with equivariant diffusion for molecular dynamics.

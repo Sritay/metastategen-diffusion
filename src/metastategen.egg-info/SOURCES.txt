@@ -1,4 +1,5 @@
 LICENSE
+README.md
 pyproject.toml
 src/metastategen/__init__.py
 src/metastategen/cli.py
@@ -24,6 +25,7 @@ src/metastategen/models/diffusion.py
 src/metastategen/models/egnn.py
 src/metastategen/models/energy.py
 src/metastategen/models/ensemble.py
+src/metastategen/models/features.py
 src/metastategen/models/force.py
 src/metastategen/models/pairwise.py
 src/metastategen/oracles/__init__.py
@@ -34,3 +36,6 @@ src/metastategen/utils/geometry.py
 src/metastategen/utils/logging.py
 src/metastategen/utils/pdb.py
 src/metastategen/utils/seed.py
+tests/test_chirality.py
+tests/test_geometry_fixes.py
+tests/test_integration.py

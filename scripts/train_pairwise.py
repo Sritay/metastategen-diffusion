@@ -27,17 +27,10 @@ class EnergyDataset(Dataset):
         # Ah, 'alanine-dipeptide-3x250ns-heavy-atom-positions.npz' is 10-atom.
         # TimeWarp dataset has 'test' and 'train' folders with full state.
         
-        # HACK: For this specific script, let's load the raw 22-atom trajectories if possible?
-        # OR: Does the processed directory contain 22-atom data?
-        # "al_pool_ref.pt" is 10-atom.
-        # "al_forces_ref.pt" is 10-atom forces? No, the user said TimeWarp data is 22-atom.
-        
-        # Checking previous context: User said "timewarp data is all 22 atom".
-        # We must align.
-        
-        # Let's assume we load everything from 'data/timewarp/train' or similar if available?
-        # Or simpler: The user presumably provided matched files.
-        # Let's trust proper files are passed in config.
+        # Data Loading Strategy:
+        # We expect the user to provide paths to forces and energies [.pt files].
+        # We infer the positions path or expect it to be handled by the specific dataset preparation.
+        # For TimeWarp data, positions should be 22-atom all-atom structures.
         
         self.shard_paths = sorted(glob.glob(f"{shard_dir}/*.pt"))
         if not self.shard_paths:
