@@ -29,7 +29,7 @@ This project implements a "Physics-Compliant" diffusion model for generating met
 ## Usage
 
 ### 1. Core Workflows (Scripts)
-The primary workflows are currently run via python scripts:
+The primary workflows are currently run via python scripts in `scripts/`. These act as wrappers around the core library logic and are fully compatible with existing SLURM submission scripts.
 
 **Training:**
 ```bash
