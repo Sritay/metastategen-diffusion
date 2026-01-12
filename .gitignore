@@ -15,9 +15,12 @@ env/
 *.err
 logs/
 
-# Archive
+
+# Archives
 scripts/archive/
 slurm/archive/
+root_archive/
+demo/temp_*.py
 
 # IDE
 .vscode/
@@ -27,12 +30,3 @@ slurm/archive/
 project_guidelines.md
 project_workflow.md
 LOCAL_DEV_NOTES.md
-
-# Archives
-root_archive/
-
-
-# Archives and Temp
-root_archive/
-demo/temp_*.py
-
