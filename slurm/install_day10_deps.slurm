@@ -9,11 +9,11 @@
 set -euo pipefail
 
 # 1. Load Modules (Same as build script)
-module use /work/y07/shared/archer2-lmod/others/dev
+module use <SITE_SPECIFIC_MODULE_PATH>
 module load ccpe/23.12/rocm/5.6.0
 module load cray-python
 
-cd /work/e760/e760/sritay/2_metastategen-diffusion
+cd <YOUR_PROJECT_ROOT>
 
 # Bind logic (Standard boilerplate)
 build_bind_list () {

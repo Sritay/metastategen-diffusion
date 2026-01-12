@@ -12,10 +12,10 @@ set -euo pipefail
 export OMP_NUM_THREADS=1
 
 # from ARCHER2 user guide
-module use /work/y07/shared/archer2-lmod/others/dev
+module use <SITE_SPECIFIC_MODULE_PATH>
 module load ccpe/23.12/rocm/5.6.0
 
-cd /work/e760/e760/sritay/2_metastategen-diffusion
+cd <YOUR_PROJECT_ROOT>
 
 echo "Host: $(hostname)"
 echo "PWD:  $(pwd)"
