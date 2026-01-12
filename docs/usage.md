@@ -6,7 +6,7 @@
 
 ## Prerequisites
 *   **OS**: Linux (tested on RHEL/CentOS via HPC).
-*   **Hardware**: CUDA GPU (A100/H100 recommended for training).
+*   **Hardware**: Capable CPU or standard consumer GPU. Use of HPC/A100 is optional (Diffusion model is small, ~1M parameters).
 *   **Software**: Python 3.10+, PyTorch 2.0+.
 
 ## Installation
