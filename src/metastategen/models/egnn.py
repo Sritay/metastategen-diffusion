@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 from dataclasses import dataclass
 from typing import Tuple, Optional
+from metastategen.models.features import compute_active_chiral_features
 
 
 def _safe_norm(x: torch.Tensor, dim: int = -1, keepdim: bool = False, eps: float = 1e-8) -> torch.Tensor:
@@ -63,6 +64,8 @@ class EGNNConfig:
     use_rbf: bool = False
     rbf_dim: int = 64
     rbf_cutoff: float = 1.0
+    use_chiral_features: bool = False
+    data_scale: float = 1.0
 
 
 class EGNNLayer(nn.Module):
@@ -83,13 +86,25 @@ class EGNNLayer(nn.Module):
             self.rbf = None
             dist_dim = 1
         
-        # Edge model: Inputs are [h_i, h_j, dist_feats, edge_attr]
-        edge_in_dim = 2 * hidden_dim + dist_dim + edge_attr_dim
+        # Edge model: Inputs are [h_i, h_j, dist_feats, edge_attr, (optional chiral_i, chiral_j)]
+        
+        if cfg.use_chiral_features:
+            # Injecting into Edge Model allows conditioning to affect Coordinate Update immediately!
+            # We append chiral_i and chiral_j to the edge input.
+            # edge_in_dim += 2 (1 for i, 1 for j)
+            edge_in_dim = 2 * hidden_dim + dist_dim + edge_attr_dim + 2
+            
+            # Keep node update injection as well (Pattern A + B)
+            node_in_dim = 2 * hidden_dim + 1
+        else:
+            edge_in_dim = 2 * hidden_dim + dist_dim + edge_attr_dim
+            node_in_dim = 2 * hidden_dim
+            
         self.phi_e = MLP(edge_in_dim, hidden_dim, hidden_dim, 
                          n_layers=cfg.edge_mlp_layers, dropout=cfg.dropout)
         
-        # Node model: Inputs are [h_i, m_i_agg]
-        self.phi_h = MLP(2 * hidden_dim, hidden_dim, hidden_dim, 
+        # Node model: Inputs are [h_i, m_i_agg, (optional chiral)]
+        self.phi_h = MLP(node_in_dim, hidden_dim, hidden_dim, 
                          n_layers=cfg.node_mlp_layers, dropout=cfg.dropout)
         
         # Coord model: Inputs are [m_ij] -> outputs scalar weight
@@ -98,7 +113,7 @@ class EGNNLayer(nn.Module):
         
         self.norm = nn.LayerNorm(hidden_dim)
 
-    def forward(self, h: torch.Tensor, x: torch.Tensor, edge_attr: Optional[torch.Tensor] = None) -> Tuple[torch.Tensor, torch.Tensor]:
+    def forward(self, h: torch.Tensor, x: torch.Tensor, edge_attr: Optional[torch.Tensor] = None, chiral_features: Optional[torch.Tensor] = None) -> Tuple[torch.Tensor, torch.Tensor]:
         B, N, H = h.shape
         
         # Pairwise differences and distances
@@ -121,8 +136,17 @@ class EGNNLayer(nn.Module):
              dist_feats = dist_sq # [B, N, N, 1]
 
         edge_inputs = [h_i, h_j, dist_feats]
+        
         if edge_attr is not None:
             edge_inputs.append(edge_attr)
+            
+        # Inject Chiral Conditioning into Edge Model
+        if chiral_features is not None:
+            # chiral_features: [B, N, 1]
+            c_i = chiral_features[:, :, None, :].expand(B, N, N, 1)
+            c_j = chiral_features[:, None, :, :].expand(B, N, N, 1)
+            edge_inputs.append(c_i)
+            edge_inputs.append(c_j)
             
         e_in = torch.cat(edge_inputs, dim=-1)
         
@@ -141,7 +165,12 @@ class EGNNLayer(nn.Module):
         
         # Node update
         m_i_agg = torch.sum(m_ij, dim=2) # [B, N, H]
-        h_in = torch.cat([h, m_i_agg], dim=-1)
+        
+        node_inputs = [h, m_i_agg]
+        if chiral_features is not None:
+            node_inputs.append(chiral_features)
+            
+        h_in = torch.cat(node_inputs, dim=-1)
         h_new = h + self.phi_h(h_in)
         h_new = self.norm(h_new)
         
@@ -163,6 +192,8 @@ class EGNN(nn.Module):
         
         if cfg is None:
             cfg = EGNNConfig(n_layers=n_layers, hidden_dim=hidden_dim)
+        
+        self.cfg = cfg
         
         # Time embedding (Sinusoidal)
         self.time_mlp = nn.Sequential(
@@ -194,12 +225,13 @@ class EGNN(nn.Module):
             emb = torch.nn.functional.pad(emb, (0, 1))
         return self.time_mlp(emb)
 
-    def forward(self, x: torch.Tensor, h: torch.Tensor, t: torch.Tensor, edge_attr: Optional[torch.Tensor] = None) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, h: torch.Tensor, t: torch.Tensor, edge_attr: Optional[torch.Tensor] = None, condition: Optional[torch.Tensor] = None) -> torch.Tensor:
         """
         Args:
             x: Noisy Coordinates [B, N, 3]
             h: Atom types (Indices) [B, N] OR [N]
             t: Time step [B]
+            condition: Optional conditioning signal [B, N, 1] (e.g. Target Chiral Volume)
         Returns:
             eps_hat: Predicted noise [B, N, 3] (calculated as displacement)
         """
@@ -216,7 +248,13 @@ class EGNN(nn.Module):
         h_emb = h_emb + t_emb[:, None, :]
         
         for layer in self.layers:
-            h_emb, x = layer(h_emb, x, edge_attr)
+            chiral_feats = None
+            if condition is not None:
+                chiral_feats = condition
+            elif self.cfg.use_chiral_features:
+                chiral_feats = compute_active_chiral_features(x, scale_factor=self.cfg.data_scale) # [B, N, 1]
+            
+            h_emb, x = layer(h_emb, x, edge_attr, chiral_features=chiral_feats)
             
         # Return the displacement as the predicted epsilon
         return x - x_in

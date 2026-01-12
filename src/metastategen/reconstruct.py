@@ -77,6 +77,14 @@ def align_and_reconstruct(
         # Translate to target center
         atoms_final = atoms_rot + x_mean[i]
         
+        # KEY FIX: Overwrite heavy atoms with the generated ones!
+        # Otherwise we just return the rigid template conformation.
+        # atoms_final is [22, 3]. heavy_indices is list of 10.
+        # Q is centered x_gen. But we added x_mean[i] back.
+        # So x_gen[i] is the actual positions.
+        
+        atoms_final[heavy_indices] = x_gen[i]
+        
         x_recon_list.append(atoms_final)
         
     return torch.stack(x_recon_list, dim=0)

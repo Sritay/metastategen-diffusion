@@ -22,7 +22,7 @@ def compute_phi_psi(samples: torch.Tensor, pdb_path: Path):
 def main():
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument("--run", type=str, default="runs/day10_al_5_hpc")
+    parser.add_argument("--run", type=str, default="runs/day11_al_23_hpc")
     args = parser.parse_args()
     
     root_dir = Path(args.run)
@@ -36,7 +36,7 @@ def main():
         print("PDB file not found.")
         return
 
-    iters = [1, 5, 9]
+    iters = [1, 10, 20]
     
     fig, axes = plt.subplots(1, 3, figsize=(18, 6), sharex=True, sharey=True)
     all_rows = []
@@ -45,7 +45,7 @@ def main():
     print("-" * 40)
     
     # Validation / Seed Path (Hardcoded for Demo Loop 5)
-    seed_path = Path("data/processed/ala2/split_5/al_seed.pt")
+    seed_path = Path("data/processed/ala2/split_12/al_seed.pt")
     
     for idx, i in enumerate(iters):
         ax = axes[idx]

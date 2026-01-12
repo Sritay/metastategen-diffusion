@@ -1,0 +1,31 @@
+2026-01-07 22:38:45 | INFO | sample_refined | Device: cpu
+2026-01-07 22:38:45 | INFO | sample_refined | Loading diffusion checkpoint from runs/day10_al_16_hpc/members/m000/checkpoints/iter_20.pt
+2026-01-07 22:38:45 | INFO | sample_refined | Loading pairwise checkpoint from runs/energy_pairwise/best_model.pt
+2026-01-07 22:38:46 | INFO | sample_refined | Generating 2 samples...
+2026-01-07 22:38:56 | INFO | sample_refined | Batch 1: Refining...
+2026-01-07 22:38:57 | INFO | sample_refined | Step 0: E_norm=6880.76 | Force_norm_pre=75782.05
+2026-01-07 22:38:57 | INFO | sample_refined | Step 1: E_norm=6880.64 | Force_norm_pre=75780.43
+2026-01-07 22:38:57 | INFO | sample_refined | Step 2: E_norm=6880.52 | Force_norm_pre=75778.78
+2026-01-07 22:38:57 | INFO | sample_refined | Step 3: E_norm=6880.41 | Force_norm_pre=75777.18
+2026-01-07 22:38:57 | INFO | sample_refined | Step 4: E_norm=6880.29 | Force_norm_pre=75775.55
+2026-01-07 22:39:03 | INFO | sample_refined | Step 1000: E_norm=6764.55 | Force_norm_pre=74172.79
+2026-01-07 22:39:08 | INFO | sample_refined | Step 2000: E_norm=6650.72 | Force_norm_pre=72604.49
+2026-01-07 22:39:14 | INFO | sample_refined | Step 3000: E_norm=6539.20 | Force_norm_pre=71068.59
+2026-01-07 22:39:20 | INFO | sample_refined | Step 4000: E_norm=6429.96 | Force_norm_pre=69587.88
+2026-01-07 22:39:26 | INFO | sample_refined | Step 5000: E_norm=6322.92 | Force_norm_pre=68201.03
+2026-01-07 22:39:31 | INFO | sample_refined | Step 6000: E_norm=6217.93 | Force_norm_pre=66916.24
+2026-01-07 22:39:36 | INFO | sample_refined | Step 7000: E_norm=6114.81 | Force_norm_pre=65714.59
+2026-01-07 22:39:41 | INFO | sample_refined | Step 8000: E_norm=6013.48 | Force_norm_pre=64577.17
+2026-01-07 22:39:47 | INFO | sample_refined | Step 9000: E_norm=5913.80 | Force_norm_pre=63493.32
+2026-01-07 22:39:52 | INFO | sample_refined | Step 10000: E_norm=5815.74 | Force_norm_pre=62457.44
+2026-01-07 22:39:58 | INFO | sample_refined | Step 11000: E_norm=5719.25 | Force_norm_pre=61466.35
+2026-01-07 22:40:04 | INFO | sample_refined | Step 12000: E_norm=5624.28 | Force_norm_pre=60516.00
+2026-01-07 22:40:10 | INFO | sample_refined | Step 13000: E_norm=5530.78 | Force_norm_pre=59602.12
+2026-01-07 22:40:15 | INFO | sample_refined | Step 14000: E_norm=5438.71 | Force_norm_pre=58722.30
+2026-01-07 22:40:20 | INFO | sample_refined | Step 15000: E_norm=5348.01 | Force_norm_pre=57874.10
+2026-01-07 22:40:25 | INFO | sample_refined | Step 16000: E_norm=5258.70 | Force_norm_pre=57054.64
+2026-01-07 22:40:29 | INFO | sample_refined | Step 17000: E_norm=5170.64 | Force_norm_pre=56258.31
+2026-01-07 22:40:34 | INFO | sample_refined | Step 18000: E_norm=5083.76 | Force_norm_pre=55482.02
+2026-01-07 22:40:38 | INFO | sample_refined | Step 19000: E_norm=4998.03 | Force_norm_pre=54723.78
+2026-01-07 22:40:45 | INFO | sample_refined | Step 19999: E_norm=4913.60 | Force_norm_pre=53982.66
+2026-01-07 22:40:45 | INFO | sample_refined | Saved refined results to runs/loop_b_refinement_16_local/refined_results.pt

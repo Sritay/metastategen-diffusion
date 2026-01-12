@@ -19,3 +19,7 @@ If you need to run locally with GPU acceleration for testing:
 
 ### Cluster (AMD MI250)
 The cluster environment likely uses ROCm. PyTorch on ROCm reports `torch.cuda.is_available() == True`, so the existing code works without modification.
+
+### Local python env
+Use .venv in repo root for local development. Activate it with:
+source .venv/bin/activate or if it doesnt work discover how to yourself just use .venv

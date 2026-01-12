@@ -1,0 +1,56 @@
+ensemble:
+  exp_id: day10_al_6_hpc
+  out_dir: runs/day10_al_6_hpc
+  members: 3
+  seeds:
+  - 111
+  - 222
+  - 333
+data:
+  seed_path: data/processed/ala2/split_6/al_seed.pt
+  pool_path: data/processed/ala2/split_6/al_pool_ref.pt
+  val_path: data/processed/ala2/split_6/al_val.pt
+  meta_path: data/processed/ala2/meta.pt
+  batch_size: 256
+  num_workers: 4
+  scale_factor: 10.0
+model:
+  type: egnn
+  n_layers: 4
+  hidden_dim: 128
+  time_emb_dim: 128
+diffusion:
+  T: 1000
+  beta_start: 0.0001
+  beta_end: 0.02
+  schedule: cosine
+  recenter_every_step: true
+train:
+  seed: 42
+  epochs: 500
+  lr: 0.0003
+  grad_clip: 1.0
+  rot_aug: true
+active_learning:
+  exp_id: day10_al_6_hpc
+  out_dir: runs/day10_al_6_hpc
+  initial_seed_size: 5000 
+  oracle_pool_source: data/processed/ala2/shards
+  split_out_dir: data/processed/ala2/split_6 
+  seed_traj: 0
+  val_traj: -1
+  val_size: 2000
+  n_iters: 10       
+  n_candidates: 5000
+  n_acquire: 500
+  acquisition_strategy: uncertainty
+  finetune_epochs: 20 
+  eval_samples: 1000
+  sample_batch_size: 200
+  sample_steps: 100
+  sample_eta: 1.0
+  oracle_batch_size: 100
+  oracle_device: cpu
+  rmsd_thresh: 0.75
+  phi_psi_bins: 180
+  seed: 123

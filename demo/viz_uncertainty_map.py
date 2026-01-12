@@ -21,7 +21,7 @@ def compute_phi_psi(samples: torch.Tensor, pdb_path: Path):
 def main():
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument("--run", type=str, default="runs/day10_al_5_hpc")
+    parser.add_argument("--run", type=str, default="runs/day11_al_23_hpc")
     args = parser.parse_args()
 
     root_dir = Path(args.run)

@@ -1,0 +1,65 @@
+
+ensemble:
+  exp_id: day11_al_21_hpc
+  out_dir: runs/day11_al_21_hpc
+  members: 3
+  seeds:
+  - 111
+  - 222
+  - 333
+data:
+  seed_path: data/processed/ala2/split_12/al_seed.pt  # Reuse split 12
+  pool_path: data/processed/ala2/split_12/al_pool_ref.pt
+  val_path: data/processed/ala2/split_12/al_val.pt
+  meta_path: data/processed/ala2/meta.pt
+  batch_size: 1024
+  num_workers: 4
+  scale_factor: 7.6
+model:
+  type: egnn
+  n_layers: 4
+  hidden_dim: 128
+  time_emb_dim: 128
+  use_rbf: true      
+  rbf_dim: 128       
+  rbf_cutoff: 20.0   
+  use_chiral_features: true  # Using EXPLICIT signed volume
+diffusion:
+  T: 1000
+  beta_start: 0.0001
+  beta_end: 0.02
+  schedule: cosine
+  recenter_every_step: true
+train:
+  seed: 42
+  epochs: 500
+  lr: 0.0003
+  grad_clip: 1.0
+  rot_aug: true
+active_learning:
+  exp_id: day11_al_21_hpc
+  out_dir: runs/day11_al_21_hpc
+  # Target Range for L-Alanine (Scaled by 1000)
+  # Verified Mean ~ -2.5. Range [-3.5, -1.5] covers this well.
+  condition_strategy: uniform
+  condition_range: [-3.5, -1.5]
+  
+  initial_seed_size: 5000 
+  oracle_pool_source: data/processed/ala2/shards
+  split_out_dir: data/processed/ala2/split_12
+  seed_traj: 0
+  val_traj: -1
+  val_size: 20000
+  n_iters: 20
+  n_candidates: 5000
+  n_acquire: 500
+  acquisition_strategy: uncertainty
+  finetune_epochs: 20 
+  eval_samples: 1000
+  sample_batch_size: 2048
+  sample_steps: 100 
+  sample_eta: 0.0
+  oracle_batch_size: 100
+  oracle_device: cpu
+  rmsd_thresh: 0.15
+  phi_psi_bins: 180

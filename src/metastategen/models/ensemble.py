@@ -22,6 +22,11 @@ def build_model_from_cfg(cfg: dict, n_atom_types: int) -> EGNN:
         node_mlp_layers=int(model_cfg.get("node_mlp_layers", 2)),
         coord_mlp_layers=int(model_cfg.get("coord_mlp_layers", 2)),
         dropout=float(model_cfg.get("dropout", 0.0)),
+        use_rbf=bool(model_cfg.get("use_rbf", False)),
+        rbf_dim=int(model_cfg.get("rbf_dim", 64)),
+        rbf_cutoff=float(model_cfg.get("rbf_cutoff", 1.0)),
+        use_chiral_features=bool(model_cfg.get("use_chiral_features", False)),
+        data_scale=float(cfg.get("data", {}).get("scale_factor", 1.0)),
     )
     model = EGNN(
         n_atom_types=n_atom_types,
@@ -35,6 +40,9 @@ def build_model_from_cfg(cfg: dict, n_atom_types: int) -> EGNN:
 
 def build_diffusion_from_cfg(cfg: dict) -> GaussianDiffusion:
     diff_cfg = cfg.get("diffusion", {})
+    data_cfg = cfg.get("data", {})
+    scale_factor = float(data_cfg.get("scale_factor", 1.0))
+    
     dcfg = DiffusionConfig(
         T=int(diff_cfg.get("T", 1000)),
         beta_start=float(diff_cfg.get("beta_start", 1e-4)),
@@ -42,6 +50,7 @@ def build_diffusion_from_cfg(cfg: dict) -> GaussianDiffusion:
         schedule=str(diff_cfg.get("schedule", "linear")),
         recenter_every_step=bool(diff_cfg.get("recenter_every_step", True)),
         ddim_eta=float(diff_cfg.get("ddim_eta", 0.0)),
+        scale_factor=scale_factor,
     )
     return GaussianDiffusion(dcfg)
 
@@ -90,17 +99,17 @@ class Ensemble(nn.Module):
         self.members = nn.ModuleList(list(members))
 
     def predict_eps(
-        self, x: torch.Tensor, h: torch.Tensor, t: torch.Tensor, edge_attr: Optional[torch.Tensor] = None
+        self, x: torch.Tensor, h: torch.Tensor, t: torch.Tensor, edge_attr: Optional[torch.Tensor] = None, **kwargs
     ) -> torch.Tensor:
         preds = []
         for m in self.members:
-            preds.append(m(x, h, t, edge_attr=edge_attr))
+            preds.append(m(x, h, t, edge_attr=edge_attr, **kwargs))
         return torch.stack(preds, dim=0)
 
     def mean_and_var(
-        self, x: torch.Tensor, h: torch.Tensor, t: torch.Tensor, edge_attr: Optional[torch.Tensor] = None
+        self, x: torch.Tensor, h: torch.Tensor, t: torch.Tensor, edge_attr: Optional[torch.Tensor] = None, **kwargs
     ) -> tuple[torch.Tensor, torch.Tensor]:
-        eps = self.predict_eps(x, h, t, edge_attr=edge_attr)
+        eps = self.predict_eps(x, h, t, edge_attr=edge_attr, **kwargs)
         mean = eps.mean(dim=0)
         var = eps.var(dim=0, unbiased=False)
         return mean, var

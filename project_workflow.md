@@ -56,8 +56,11 @@ A stronger, data-efficient diffusion model with demonstrated active-learning ben
 2️⃣ **Sample Candidate Structures**
 - Generate conformations from the diffusion model.
 
-3️⃣ **Optional Filtering**
-- Remove obviously invalid geometries.
+3️⃣ **Filtering (Top 1%)**
+- Generate a large pool (e.g., 10,000 samples).
+- Compute Force-Surrogate Energy for all.
+- Keep only the lowest energy ~1% (e.g., 100) for expensive refinement.
+- *Note:* This significantly improves yield of metastable states.
 
 4️⃣ **Force-Surrogate Refinement**
 - Apply short Langevin / gradient refinement using learned force predictor.
@@ -70,6 +73,9 @@ A stronger, data-efficient diffusion model with demonstrated active-learning ben
 - Compare φ/ψ densities
 - Compare free-energy landscapes
 - Evaluate basin coverage / clustering
+- **Visualization (Movie Generation):**
+  - Since filtering breaks the 1-to-1 index, use **RMSD Matching** to pair each refined structure with its closest "initial" parent from the generated pool.
+  - Create interleaved PDB (Frame N: Raw, Frame N+1: Refined).
 
 **Outcome:**  
 Physically plausible, diverse, and validated molecular structures.

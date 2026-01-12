@@ -16,7 +16,7 @@ except ImportError:  # Fallback for older package exports.
     from metastategen.data.manager import ALDataManager, load_al_data
 from metastategen.eval.coverage import kl_from_phi_psi
 from metastategen.eval.rmsd import greedy_cluster, rmsd_kabsch
-from metastategen.models.diffusion import center
+from metastategen.models.diffusion import center, constrain_bonds, constrain_chirality
 from metastategen.models.ensemble import (
     Ensemble,
     build_diffusion_from_cfg,
@@ -26,6 +26,7 @@ from metastategen.models.ensemble import (
 )
 from metastategen.oracles import DatasetOracle
 from metastategen.utils import get_logger, set_deterministic
+from metastategen.models.features import compute_chiral_volume_signal
 from metastategen.utils.geometry import compute_dihedrals, rad2deg
 from metastategen.utils.pdb import get_ala2_heavy_atom_indices
 
@@ -107,8 +108,16 @@ def _train_member(
             x = batch["x"].to(device)
             a = batch["a"].to(device)
             bsz = x.shape[0]
+            
+            # Compute Chiral Conditioning Signal (from CLEAN x)
+            # x is scaled by scale_factor, so we must tell the function to unscale it
+            scale_factor = diffusion.cfg.scale_factor
+            condition = None
+            if hasattr(model, "cfg") and getattr(model.cfg, "use_chiral_features", False):
+                 condition = compute_chiral_volume_signal(x, scale_factor=scale_factor)
+            
             t = torch.randint(1, diffusion.cfg.T + 1, (bsz,), device=device)
-            loss, _ = diffusion.training_loss(model, x, a, t, rot_aug=rot_aug)
+            loss, _ = diffusion.training_loss(model, x, a, t, rot_aug=rot_aug, condition=condition)
             opt.zero_grad()
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
@@ -127,7 +136,7 @@ def _train_member(
 
 
 @torch.no_grad()
-def _consensus_ddpm(ensemble: Ensemble, diffusion, shape: tuple[int, ...], h: torch.Tensor):
+def _consensus_ddpm(ensemble: Ensemble, diffusion, shape: tuple[int, ...], h: torch.Tensor, model_kwargs: dict = None):
     device = diffusion.betas.device
     bsz = shape[0]
     xt = torch.randn(shape, device=device)
@@ -139,7 +148,7 @@ def _consensus_ddpm(ensemble: Ensemble, diffusion, shape: tuple[int, ...], h: to
 
     for i in reversed(range(1, diffusion.cfg.T + 1)):
         t = torch.full((bsz,), i, device=device, dtype=torch.long)
-        eps_stack = ensemble.predict_eps(xt, h, t)
+        eps_stack = ensemble.predict_eps(xt, h, t, **(model_kwargs or {}))
         if diffusion.cfg.recenter_every_step:
             eps_stack = center_ensemble(eps_stack)
 
@@ -156,13 +165,27 @@ def _consensus_ddpm(ensemble: Ensemble, diffusion, shape: tuple[int, ...], h: to
         alpha = diffusion.alphas[idx]
         alpha_bar = diffusion.alphas_cumprod[idx]
 
-        mean = (1 / torch.sqrt(alpha)) * (xt - (beta / torch.sqrt(1 - alpha_bar)) * mean_eps)
+        # Stability: clamp pred_x0 to prevent singularity at t=T
+        sqrt_alpha_bar = torch.sqrt(alpha_bar)
+        sqrt_one_minus_alpha_bar = torch.sqrt(1 - alpha_bar)
+        
+        pred_x0 = (xt - sqrt_one_minus_alpha_bar * mean_eps) / (sqrt_alpha_bar + 1e-8)
+        pred_x0 = torch.clamp(pred_x0, -10.0, 10.0)
+        
+        # Recompute effective noise from clamped x0
+        mean_eps = (xt - sqrt_alpha_bar * pred_x0) / sqrt_one_minus_alpha_bar
+        
+        mean = (1 / torch.sqrt(alpha)) * (xt - (beta / sqrt_one_minus_alpha_bar) * mean_eps)
         if i > 1:
             sigma = torch.sqrt(diffusion.posterior_variance[idx])
             noise = torch.randn_like(xt)
             xt = mean + sigma * noise
         else:
             xt = mean
+            
+        xt = constrain_chirality(xt, scale_factor=diffusion.cfg.scale_factor)
+        xt = constrain_bonds(xt, scale_factor=diffusion.cfg.scale_factor)
+        
         if diffusion.cfg.recenter_every_step:
             xt = center(xt)
 
@@ -177,6 +200,7 @@ def _consensus_ddim(
     h: torch.Tensor,
     steps: int,
     eta: float,
+    model_kwargs: dict = None,
 ):
     device = diffusion.betas.device
     bsz = shape[0]
@@ -192,7 +216,7 @@ def _consensus_ddim(
         t = torch.full((bsz,), t_val, device=device, dtype=torch.long)
         prev_t_val = times[i + 1] if i < len(times) - 1 else torch.tensor(0, device=device)
 
-        eps_stack = ensemble.predict_eps(xt, h, t)
+        eps_stack = ensemble.predict_eps(xt, h, t, **(model_kwargs or {}))
         if diffusion.cfg.recenter_every_step:
             eps_stack = center_ensemble(eps_stack)
 
@@ -212,10 +236,13 @@ def _consensus_ddim(
 
         sigma = eta * torch.sqrt((1 - alpha_bar_prev) / (1 - alpha_bar) * (1 - alpha_bar / alpha_bar_prev))
         pred_x0 = (xt - torch.sqrt(1 - alpha_bar) * mean_eps) / torch.sqrt(alpha_bar)
+        pred_x0 = torch.clamp(pred_x0, -10.0, 10.0) # Prevent singularity at t=T
         dir_xt = torch.sqrt(1 - alpha_bar_prev - sigma**2) * mean_eps
         noise = torch.randn_like(xt) if eta > 0 else 0.0
 
         xt = torch.sqrt(alpha_bar_prev) * pred_x0 + dir_xt + sigma * noise
+        xt = constrain_chirality(xt, scale_factor=diffusion.cfg.scale_factor)
+        xt = constrain_bonds(xt, scale_factor=diffusion.cfg.scale_factor)
         if diffusion.cfg.recenter_every_step:
             xt = center(xt)
 
@@ -231,6 +258,7 @@ def _sample_candidates(
     batch_size: int,
     steps: int,
     eta: float,
+    condition: torch.Tensor | dict = None,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     ensemble.eval()
     device = diffusion.betas.device
@@ -242,12 +270,40 @@ def _sample_candidates(
         curr_bs = min(batch_size, n_samples - len(samples) * batch_size)
         h = atom_types.unsqueeze(0).expand(curr_bs, -1).to(device)
         shape = (curr_bs, n_atoms, 3)
+        model_kwargs = {}
+        
+        c_batch = None
+        if condition is not None:
+             # Case 1: Dynamic Sampling (Dict)
+             if isinstance(condition, dict):
+                 strategy = condition.get("strategy", "fixed")
+                 if strategy == "uniform":
+                     c_min = condition.get("min", 0.0)
+                     c_max = condition.get("max", 0.1)
+                     # Sample uniformly [min, max]
+                     # Shape: [B, 1]
+                     c_vals = torch.rand(curr_bs, 1, device=device) * (c_max - c_min) + c_min
+                     # Expand to atoms: [B, N, 1]
+                     c_batch = c_vals.unsqueeze(1).expand(-1, n_atoms, -1)
+             
+             # Case 2: Fixed Tensor
+             elif isinstance(condition, torch.Tensor):
+                 # Expand fixed condition to batch: [N_atoms, 1] -> [B, N_atoms, 1]
+                 # Assuming condition is [N, 1] derived from mean of corpus
+                 if condition.dim() == 2:
+                     c_batch = condition.unsqueeze(0).expand(curr_bs, -1, -1).to(device)
+                 else:
+                     c_batch = condition.to(device) # Already batched?
+        
+        if c_batch is not None:
+            model_kwargs["condition"] = c_batch
+
         if eta == 0.0 and steps < diffusion.cfg.T:
-            x0, unc = _consensus_ddim(ensemble, diffusion, shape, h, steps=steps, eta=eta)
+            x0, unc = _consensus_ddim(ensemble, diffusion, shape, h, steps=steps, eta=eta, model_kwargs=model_kwargs)
         else:
             if eta != 0.0 and steps < diffusion.cfg.T:
                 log.warning("DDIM steps < T with eta>0 is not supported; using full DDPM steps.")
-            x0, unc = _consensus_ddpm(ensemble, diffusion, shape, h)
+            x0, unc = _consensus_ddpm(ensemble, diffusion, shape, h, model_kwargs=model_kwargs)
         samples.append(x0.cpu())
         uncertainty.append(unc.cpu())
         log.info("Sample batch %d/%d done.", i + 1, n_batches)
@@ -286,6 +342,7 @@ def _evaluate(
     cfg: dict,
     iter_dir: Path,
     seed: int,
+    condition: torch.Tensor | dict = None,
 ) -> dict:
     al_cfg = cfg.get("active_learning", {})
     n_eval = int(al_cfg.get("eval_samples", 1000))
@@ -295,7 +352,12 @@ def _evaluate(
     rmsd_thresh = float(al_cfg.get("rmsd_thresh", 0.75))
 
     set_deterministic(seed)
-    samples, _ = _sample_candidates(ensemble, diffusion, atom_types, n_eval, batch_size, steps, eta)
+    samples, _ = _sample_candidates(ensemble, diffusion, atom_types, n_eval, batch_size, steps, eta, condition=condition)
+    
+    # Scale correction
+    scale_factor = float(cfg.get("data", {}).get("scale_factor", 1.0))
+    samples = samples / scale_factor
+
     torch.save(samples, iter_dir / "eval_samples.pt")
 
     meta_path = Path(cfg["data"].get("meta_path", "data/processed/ala2/meta.pt"))
@@ -350,10 +412,36 @@ def main() -> int:
     seed_data = load_al_data(seed_path)
     val_data = load_al_data(val_path)
 
-    manager = ALDataManager(seed_data)
+    scale_factor = float(data_cfg.get("scale_factor", 1.0))
+    if scale_factor != 1.0:
+        log.info("Using data scale factor: %f", scale_factor)
+
+    manager = ALDataManager(seed_data, scale_factor=scale_factor)
 
     atom_types = seed_data["atom_types"]
     n_atom_types = int(atom_types.max().item()) + 1
+    
+    # Compute Target Chiral Condition
+    condition_strategy = al_cfg.get("condition_strategy", "fixed")
+    target_condition = None
+    
+    if condition_strategy == "uniform":
+        c_range = al_cfg.get("condition_range", [0.01, 0.08])
+        log.info(f"Using Uniform Conditioning: {c_range}")
+        target_condition = {
+            "strategy": "uniform",
+            "min": float(c_range[0]),
+            "max": float(c_range[1])
+        }
+    else:
+        # Fixed strategy (Default)
+        # Compute from Seed Data (Assumed L-Alanine)
+        with torch.no_grad():
+            # Seed data loaded from .pt is typically raw (nm).
+            pos_subset = seed_data["positions"][:100]
+            computed = compute_chiral_volume_signal(pos_subset, scale_factor=1.0).mean(dim=0)
+            target_condition = computed.to(torch.device("cpu"))
+            log.info(f"Using Fixed Conditioning: {target_condition.mean().item():.4f}")
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     diffusion = build_diffusion_from_cfg(cfg).to(device)
@@ -382,6 +470,8 @@ def main() -> int:
     oracle_device = al_cfg.get("oracle_device", "cpu")
     oracle = DatasetOracle(pool_path, device=oracle_device, batch_size=int(al_cfg.get("oracle_batch_size", 100)))
 
+    # Val data is loaded raw (nm). ALDataManager handles scaling for training.
+    # Metrics evaluation expects nm.
     val_phi_psi = None
     if "phi_psi" in val_data:
         val_phi_psi = val_data["phi_psi"].cpu().numpy()
@@ -430,7 +520,7 @@ def main() -> int:
     iter_dir = run_root / "iter_00"
     iter_dir.mkdir(parents=True, exist_ok=True)
     eval_seed = int(al_cfg.get("seed", train_cfg.get("seed", 0)))
-    metrics = _evaluate(ensemble, diffusion, atom_types, val_phi_psi, val_medoids, cfg, iter_dir, eval_seed)
+    metrics = _evaluate(ensemble, diffusion, atom_types, val_phi_psi, val_medoids, cfg, iter_dir, eval_seed, condition=target_condition)
     metrics.update(
         {
             "iter": 0,
@@ -465,7 +555,12 @@ def main() -> int:
             batch_size=int(al_cfg.get("sample_batch_size", 200)),
             steps=int(al_cfg.get("sample_steps", 100)),
             eta=float(al_cfg.get("sample_eta", 0.0)),
+            condition=target_condition,
         )
+        
+        # UNSCALE generated samples before saving/using
+        samples = samples / scale_factor
+
         torch.save(samples, iter_dir / "candidates.pt")
         torch.save(uncertainty, iter_dir / "uncertainty.pt")
 
@@ -567,6 +662,7 @@ def main() -> int:
             cfg,
             iter_dir,
             eval_seed + 1000 + iter_idx,
+            condition=target_condition,
         )
         metrics.update(
             {

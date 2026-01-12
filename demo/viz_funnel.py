@@ -13,6 +13,12 @@ from metastategen.models.pairwise import PairwiseEnergyModel
 from metastategen.reconstruct import align_and_reconstruct
 from metastategen.utils.geometry import compute_dihedrals, rad2deg
 from metastategen.utils.pdb import get_ala2_heavy_atom_indices
+try:
+    from regions import plot_regions
+except ImportError:
+    import sys
+    sys.path.append(str(Path(__file__).parent))
+    from regions import plot_regions
 
 log = get_logger("viz_funnel")
 
@@ -62,6 +68,47 @@ def load_pairwise_model(ckpt_path, device):
         stats['f_std'] = d['f_std'].to(device)
     return model, stats
 
+def get_atom_info(pdb_path: Path):
+    """Parses PDB to extract atom names and residues for writing."""
+    atom_info = []
+    with open(pdb_path, 'r') as f:
+        for line in f:
+            if line.startswith("ATOM") or line.startswith("HETATM"):
+                atom_info.append(line.strip())
+    return atom_info
+
+def save_to_pdb(samples: torch.Tensor, atom_template: list, out_path: Path):
+    """Writes samples to a multi-model PDB file."""
+    with open(out_path, 'w') as f:
+        for i, sample in enumerate(samples):
+            f.write(f"MODEL     {i+1}\n")
+            for j, line in enumerate(atom_template):
+                # Replace coordinates in the fixed-width format
+                # val: 30-38 (x), 38-46 (y), 46-54 (z)
+                x = sample[j, 0].item()
+                y = sample[j, 1].item()
+                z = sample[j, 2].item()
+                # PDB format requires specific spacing; simplest is to construct line carefully or overwrite
+                # Line structure:
+                # 0-30: Identity info (unchanged)
+                # 30-54: Coords
+                # 54+: Remainder
+                
+                # Careful with line length handling
+                # Standard PDB: 
+                # ATOM      1  N   ALA A   1      -0.525   1.363   0.000  1.00  0.00           N
+                
+                # We can just format a new line if we parsed components, but replacing substring is safer for preserving other fields
+                # assuming standard columns.
+                # However, Python string slicing is easy.
+                
+                prefix = line[:30]
+                suffix = line[54:]
+                coords = f"{x:8.3f}{y:8.3f}{z:8.3f}"
+                f.write(f"{prefix}{coords}{suffix}\n")
+            f.write("ENDMDL\n")
+    log.info(f"Saved PDB to {out_path}")
+
 def compute_phi_psi(samples: torch.Tensor, pdb_path: Path):
     phi_idx, psi_idx = get_ala2_heavy_atom_indices(pdb_path)
     indices = torch.tensor([phi_idx, psi_idx], dtype=torch.long, device=samples.device)
@@ -82,6 +129,7 @@ def main():
     parser.add_argument("--step-size", type=float, default=1e-7) # Careful step size
     parser.add_argument("--refinement-steps", type=int, default=500)
     parser.add_argument("--out-dir", type=str, default="demo")
+    parser.add_argument("--data-path", type=str, help="Path to refined_results.pt")
     parser.add_argument("--pdb-path", type=str, default="/Users/sritaymistry/projects/metastategen-diffusion/data/raw/alanine-dipeptide-nowater.pdb")
     
     args = parser.parse_args()
@@ -94,59 +142,39 @@ def main():
         # Fallback to iter_03
         args.diff_ckpt = "runs/day8_9_al_3/members/m000/checkpoints/iter_03.pt"
     
-    log.info("Loading models...")
-    diff_model, diffusion, _ = load_diffusion_model(Path(args.diff_config), Path(args.diff_ckpt), device)
-    diff_model.eval()
-    
-    force_model, f_stats = load_pairwise_model(Path(args.force_ckpt), device)
-    force_model.eval()
-    
-    templ_path = Path("data/timewarp/train/positions.pt")
-    templ_all = torch.load(templ_path)[0].to(device)
-    heavy_indices = [1, 4, 5, 6, 8, 10, 14, 15, 16, 18]
-    
-    # Get atom types
-    shard_path = next(Path("data/processed/ala2/shards").glob("*.pt"))
-    diff_types = torch.load(shard_path)['atom_types'].to(device)
+    # Models are not needed for visualization of pre-computed results
+    # log.info("Loading models...")
+    # diff_model, diffusion, _ = load_diffusion_model(Path(args.diff_config), Path(args.diff_ckpt), device)
+    # diff_model.eval()
+    # force_model, f_stats = load_pairwise_model(Path(args.force_ckpt), device)
+    # force_model.eval()
+    # templ_path = Path("data/timewarp/train/positions.pt")
+    # templ_all = torch.load(templ_path)[0].to(device)
+    # heavy_indices = [1, 4, 5, 6, 8, 10, 14, 15, 16, 18]
+    # shard_path = next(Path("data/processed/ala2/shards").glob("*.pt"))
+    # diff_types = torch.load(shard_path)['atom_types'].to(device)
 
-    pre_samples = []
-    post_samples = []
-    
-    n_batches = (args.n_samples + args.batch_size - 1) // args.batch_size
-    log.info(f"Generating {args.n_samples} samples...")
-    
-    for i in range(n_batches):
-        B = min(args.batch_size, args.n_samples - (i * args.batch_size))
-        
-        # Generator
-        a_batch = diff_types.unsqueeze(0).expand(B, -1)
-        shape = (B, 10, 3)
-        with torch.no_grad():
-            x_10 = diffusion.p_sample_loop(diff_model, shape, a_batch)
-        
-        # Reconstruct
-        x_22 = align_and_reconstruct(x_10, templ_all, heavy_indices)
-        pre_samples.append(x_22.cpu())
-        
-        # Refine (Minimization)
-        x_curr = x_22.clone().to(device).requires_grad_(True)
-        for _ in range(args.refinement_steps):
-            e_norm = force_model(x_curr)
-            grad = torch.autograd.grad(e_norm.sum(), x_curr)[0]
-            f_pred = -grad * f_stats['e_std']
-            with torch.no_grad():
-                x_curr.data += args.step_size * f_pred
-        
-        post_samples.append(x_curr.detach().cpu())
-        log.info(f"Batch {i+1} done")
-        
-    pre_samples = torch.cat(pre_samples, dim=0)
-    post_samples = torch.cat(post_samples, dim=0)
+    # Load pre-computed results
+    if args.data_path and Path(args.data_path).exists():
+        log.info(f"Loading results from {args.data_path}")
+        results = torch.load(args.data_path, map_location=device)
+        pre_samples = results['initial_positions']
+        post_samples = results['refined_positions']
+        args.n_samples = pre_samples.shape[0]
+    else: 
+        log.error("Data path not provided or not found. Please provide --data-path to refined_results.pt")
+        return
     
     # Compute Phi/Psi
     log.info("Computing Dihedrals...")
     pre_phi_psi = compute_phi_psi(pre_samples, Path(args.pdb_path))
     post_phi_psi = compute_phi_psi(post_samples, Path(args.pdb_path))
+
+    # Save PDBs (First 100 samples)
+    atom_info = get_atom_info(Path(args.pdb_path))
+    n_save = min(100, args.n_samples)
+    save_to_pdb(pre_samples[:n_save], atom_info, Path(args.out_dir) / "initial_ensemble.pdb")
+    save_to_pdb(post_samples[:n_save], atom_info, Path(args.out_dir) / "refined_ensemble.pdb")
     
     # Plotting
     plt.figure(figsize=(10, 8))
@@ -170,6 +198,14 @@ def main():
                   color='gray', alpha=0.2, width=0.5)
 
     plt.legend()
+    
+    # Overlay Ground Truth Regions
+    ax = plt.gca()
+    try:
+        plot_regions(ax)
+    except Exception as e:
+        log.warning(f"Could not plot regions: {e}")
+
     plt.grid(True, linestyle='--', alpha=0.5)
     
     out_file = Path(args.out_dir) / "funnel_plot.png"

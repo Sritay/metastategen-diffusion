@@ -44,6 +44,119 @@ def apply_rotation(x: torch.Tensor, R: torch.Tensor) -> torch.Tensor:
     # Let's use einsum for clarity: "bij,bnj->bni" matches R * x^T
     return torch.einsum("bij,bnj->bni", R, x)
 
+def constrain_chirality(x: torch.Tensor, scale_factor: float = 1.0) -> torch.Tensor:
+    """
+    Enforces L-Alanine Chirality via Geometric Reflection.
+    """
+    if x.shape[1] != 10:
+        return x
+        
+    # Indices
+    idx_N, idx_CA, idx_CB, idx_C = 3, 4, 5, 6
+    
+    r_CA = x[:, idx_CA]
+    r_N = x[:, idx_N]
+    r_CB = x[:, idx_CB]
+    r_C = x[:, idx_C]
+    
+    # Plane defined by N, CA, C
+    v_N = r_N - r_CA
+    v_C = r_C - r_CA
+    
+    # Normal to plane (Unnormalized cross product gives 2*Area direction)
+    # Note: We use C x N to match the sign of features.py (N . (CB x C))
+    # vol = CB . (C x N) = N . (CB x C) = V_feat
+    plane_normal = torch.cross(v_C, v_N, dim=-1) # [B, 3]
+    
+    # Check "Side" of CB
+    v_CB = r_CB - r_CA
+    
+    # Scalar Triple Product (Volume propto)
+    vol = torch.sum(v_CB * plane_normal, dim=-1) # [B]
+    
+    # Identify False Chirality (Vol > 0 for D-Ala, we want < 0 for L-Ala)
+    # Mask [B]
+    mask = (vol > 0).float().unsqueeze(-1) # [B, 1]
+    
+    if mask.sum() == 0:
+        return x
+        
+    # Reflection Logic
+    # r_new = r - 2 * (r . n) * n / |n|^2
+    # Here vector r is v_CB. Vector n is plane_normal.
+    
+    # Normalize plane normal for easier projection
+    n_norm = torch.nn.functional.normalize(plane_normal, dim=-1)
+    
+    # Projection of CB onto Normal
+    # dot [B, 1]
+    dot = torch.sum(v_CB * n_norm, dim=-1, keepdim=True)
+    
+    # Reflection vector (Perpendicular component * 2)
+    # moves CB to the other side
+    reflection = 2 * dot * n_norm
+    
+    # Apply reflection only to D-enantiomers
+    # Only move CB!
+    # Update x
+    delta = mask * reflection
+    x[:, idx_CB] = x[:, idx_CB] - delta
+    
+    return x
+
+def constrain_bonds(x: torch.Tensor, scale_factor: float = 1.0) -> torch.Tensor:
+    """
+    Projects backbone bonds (N-CA, CA-C) to target lengths.
+    Indices: N=3, CA=4, C=6.
+    """
+    # Valid only for Ala2 (10 atoms)
+    if x.shape[1] != 10:
+        return x
+    
+    # Constraints (nm)
+    # Standard lengths from template
+    t_ch3_c  = 0.152 * scale_factor # 0-1 (CH3-C)
+    t_c_o    = 0.123 * scale_factor # 1-2 (C=O)
+    t_c_n    = 0.133 * scale_factor # 1-3 (C-N)
+    
+    t_n_ca   = 0.146 * scale_factor # 3-4 (N-CA)
+    t_ca_cb  = 0.153 * scale_factor # 4-5 (CA-CB)
+    t_ca_c   = 0.151 * scale_factor # 4-6 (CA-C)
+    
+    t_c_o_2  = 0.123 * scale_factor # 6-7 (C=O)
+    t_c_n_2  = 0.133 * scale_factor # 6-8 (C-N)
+    t_n_c    = 0.146 * scale_factor # 8-9 (N-C)
+
+    constraints = [
+        (0, 1, t_ch3_c),
+        (1, 2, t_c_o),
+        (1, 3, t_c_n),
+        (3, 4, t_n_ca),
+        (4, 5, t_ca_cb),
+        (4, 6, t_ca_c),
+        (6, 7, t_c_o_2),
+        (6, 8, t_c_n_2),
+        (8, 9, t_n_c)
+    ]
+    
+    # Iterative projection
+    for _ in range(10):
+        for i1, i2, dist_target in constraints:
+            p1 = x[:, i1]
+            p2 = x[:, i2]
+            diff = p2 - p1
+            dist = torch.norm(diff, dim=1, keepdim=True) + 1e-8
+            
+            # Correction
+            delta = diff * (dist_target / dist - 1.0)
+            
+            x[:, i1] -= 0.5 * delta
+            x[:, i2] += 0.5 * delta
+            
+    return x
+
+
+
 @dataclass
 class DiffusionConfig:
     T: int = 1000
@@ -52,12 +165,31 @@ class DiffusionConfig:
     schedule: str = "linear"  # "linear" | "cosine"
     recenter_every_step: bool = True
     ddim_eta: float = 0.0
+    scale_factor: float = 1.0
 
 class GaussianDiffusion(nn.Module):
     """
     Gaussian Diffusion for E(3) equivariant data.
     """
     def __init__(self, cfg: DiffusionConfig):
+        super().__init__()
+        self.cfg = cfg
+        
+        if cfg.schedule == "linear":
+            betas = torch.linspace(cfg.beta_start, cfg.beta_end, cfg.T)
+        elif cfg.schedule == "cosine":
+            # ... (rest of init is same, need to be careful not to delete)
+            # Actually this replace call is too big/risky to replace everything.
+            # I should split the edits.
+            pass
+
+# Wait, I cannot use "pass" in ReplacementContent. 
+# I will make 3 separate edits: 
+# 1. Add function.
+# 2. Edit p_sample_loop.
+# 3. Edit ddim_sample_loop.
+# This prevents accidentally deleting the class body.
+
         super().__init__()
         self.cfg = cfg
         
@@ -100,7 +232,7 @@ class GaussianDiffusion(nn.Module):
         xt = sqrt_alpha_bar * x0 + sqrt_one_minus_alpha_bar * noise
         return xt
 
-    def training_loss(self, model: nn.Module, x0: torch.Tensor, h: torch.Tensor, t: torch.Tensor, rot_aug: bool = False) -> Tuple[torch.Tensor, Dict[str, float]]:
+    def training_loss(self, model: nn.Module, x0: torch.Tensor, h: torch.Tensor, t: torch.Tensor, rot_aug: bool = False, **model_kwargs) -> Tuple[torch.Tensor, Dict[str, float]]:
         """
         Computes MSE loss between added noise and predicted noise.
         
@@ -134,7 +266,7 @@ class GaussianDiffusion(nn.Module):
             
         # 3. Predict Noise
         # Note: Model is expected to return epsilon_hat
-        eps_hat = model(xt, h, t)
+        eps_hat = model(xt, h, t, **model_kwargs)
         
         if self.cfg.recenter_every_step:
             eps_hat = center(eps_hat)
@@ -144,7 +276,7 @@ class GaussianDiffusion(nn.Module):
         return loss, {"mse": loss.item()}
 
     @torch.no_grad()
-    def p_sample_loop(self, model: nn.Module, shape: Tuple[int, ...], h: torch.Tensor, steps: Optional[int] = None) -> torch.Tensor:
+    def p_sample_loop(self, model: nn.Module, shape: Tuple[int, ...], h: torch.Tensor, steps: Optional[int] = None, model_kwargs: Optional[Dict] = None) -> torch.Tensor:
         """
         DDPM Sampling (Stochastic).
         """
@@ -162,7 +294,7 @@ class GaussianDiffusion(nn.Module):
             t = torch.full((B,), i, device=device, dtype=torch.long)
             
             # Predict noise
-            eps_hat = model(xt, h, t)
+            eps_hat = model(xt, h, t, **(model_kwargs or {}))
             if self.cfg.recenter_every_step:
                 eps_hat = center(eps_hat)
             
@@ -182,13 +314,19 @@ class GaussianDiffusion(nn.Module):
             else:
                 xt = mean
                 
+            # Enforce constraints
+            # 1. Chirality (Push to L-basin)
+            xt = constrain_chirality(xt, scale_factor=self.cfg.scale_factor)
+            # 2. Bonds (Fix lengths)
+            xt = constrain_bonds(xt, scale_factor=self.cfg.scale_factor)
+            
             if self.cfg.recenter_every_step:
                 xt = center(xt)
                 
         return xt
 
     @torch.no_grad()
-    def ddim_sample_loop(self, model: nn.Module, shape: Tuple[int, ...], h: torch.Tensor, steps: int = 50, eta: float = 0.0) -> torch.Tensor:
+    def ddim_sample_loop(self, model: nn.Module, shape: Tuple[int, ...], h: torch.Tensor, steps: int = 50, eta: float = 0.0, model_kwargs: Optional[Dict] = None) -> torch.Tensor:
         """
         DDIM Sampling.
         """
@@ -207,7 +345,7 @@ class GaussianDiffusion(nn.Module):
             # Next timestep (t-1 in paper, but strided here)
             prev_t_val = times[i+1] if i < len(times)-1 else torch.tensor(0, device=device)
             
-            eps_hat = model(xt, h, t)
+            eps_hat = model(xt, h, t, **(model_kwargs or {}))
             if self.cfg.recenter_every_step:
                 eps_hat = center(eps_hat)
 
@@ -230,6 +368,12 @@ class GaussianDiffusion(nn.Module):
             noise = torch.randn_like(xt) if eta > 0 else 0.0
             
             xt = torch.sqrt(alpha_bar_prev) * pred_x0 + dir_xt + sigma * noise
+            
+            # Enforce constraints
+            # 1. Chirality (Push to L-basin)
+            xt = constrain_chirality(xt, scale_factor=self.cfg.scale_factor)
+            # 2. Bonds (Fix lengths)
+            xt = constrain_bonds(xt, scale_factor=self.cfg.scale_factor)
             
             if self.cfg.recenter_every_step:
                 xt = center(xt)

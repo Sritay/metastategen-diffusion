@@ -13,10 +13,12 @@ class Ala2Dataset(Dataset):
         self, 
         shard_dir: str, 
         trajs: Optional[List[int]] = None,
-        subsample: int = 1
+        subsample: int = 1,
+        scale_factor: float = 1.0
     ):
         super().__init__()
         self.shard_paths = sorted(glob.glob(f"{shard_dir}/*.pt"))
+        self.scale_factor = scale_factor
         if not self.shard_paths:
             log.warning(f"No shards found in {shard_dir}")
             
@@ -62,14 +64,14 @@ class Ala2Dataset(Dataset):
             self.atom_types = torch.empty(0)
             self.traj_ids = torch.empty(0)
             
-        log.info(f"Loaded {len(self.positions)} frames from {len(self.shard_paths)} shards. Trajs={trajs}, Subsample={subsample}")
+        log.info(f"Loaded {len(self.positions)} frames from {len(self.shard_paths)} shards. Trajs={trajs}, Subsample={subsample}, Scale={scale_factor}")
 
     def __len__(self):
         return len(self.positions)
 
     def __getitem__(self, idx):
         return {
-            "x": self.positions[idx],       # [N, 3]
+            "x": self.positions[idx] * self.scale_factor,       # [N, 3]
             "a": self.atom_types,           # [N]
             "t": self.traj_ids[idx]         # Scalar
         }

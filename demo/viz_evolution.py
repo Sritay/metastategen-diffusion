@@ -56,7 +56,7 @@ def compute_phi_psi(samples_path: Path, pdb_path: Path):
 def main():
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument("--run", type=str, default="runs/day10_al_5_hpc")
+    parser.add_argument("--run", type=str, default="runs/day11_al_23_hpc")
     args = parser.parse_args()
     
     root_dir = Path(args.run)
@@ -65,10 +65,10 @@ def main():
         return
 
     # Plot Iter 0 (Init), 3 (Early), 6 (Mid), 10 (Final)
-    iters = [0, 3, 6, 10]
+    iters = [0, 5, 10, 15, 20]
     pdb_path = Path("/Users/sritaymistry/projects/metastategen-diffusion/data/raw/alanine-dipeptide-nowater.pdb")
     
-    fig, axes = plt.subplots(1, 4, figsize=(20, 5), sharex=True, sharey=True)
+    fig, axes = plt.subplots(1, 5, figsize=(25, 5), sharex=True, sharey=True)
     
     all_data = []
     

@@ -18,10 +18,14 @@ def load_diffusion_model(config_path, ckpt_path, device):
         
     model_cfg = EGNNConfig(
         n_layers=cfg['model']['n_layers'],
-        hidden_dim=cfg['model']['hidden_dim']
+        hidden_dim=cfg['model']['hidden_dim'],
+        use_chiral_features=cfg['model'].get('use_chiral_features', False),
+        use_rbf=cfg['model'].get('use_rbf', False),
+        rbf_dim=cfg['model'].get('rbf_dim', 64),
+        rbf_cutoff=cfg['model'].get('rbf_cutoff', 1.0)
     )
-    # Hardcoded for 10-atom backbone models
-    n_atom_types = 5 
+    # Hardcoded for 10-atom backbone models (Active Learning Loop 5 used 3 types: C, O, N)
+    n_atom_types = 3 
     
     model = EGNN(
         n_atom_types=n_atom_types,
@@ -31,12 +35,15 @@ def load_diffusion_model(config_path, ckpt_path, device):
         cfg=model_cfg
     ).to(device)
     
+    scale_factor = float(cfg['data'].get('scale_factor', 1.0))
+    
     diff_cfg = DiffusionConfig(
         T=cfg['diffusion']['T'],
         beta_start=cfg['diffusion']['beta_start'],
         beta_end=cfg['diffusion']['beta_end'],
         schedule=cfg['diffusion']['schedule'],
-        recenter_every_step=cfg['diffusion']['recenter_every_step']
+        recenter_every_step=cfg['diffusion']['recenter_every_step'],
+        scale_factor=scale_factor
     )
     diffusion = GaussianDiffusion(diff_cfg).to(device)
     
@@ -66,6 +73,31 @@ def load_pairwise_model(ckpt_path, device):
         
     return model, stats
 
+def constrain_bonds_22(x):
+    """
+    Projects backbone bonds (N-CA, CA-C) to target lengths for 22-atom Timewarp structure.
+    Indices: N=6, CA=8, C=14.
+    """
+    t1 = 0.146 # N-CA
+    t2 = 0.151 # CA-C
+    
+    constraints = [
+        (6, 8, t1),
+        (8, 14, t2)
+    ]
+    
+    # Iterative projection
+    for _ in range(5):
+        for i1, i2, dist_target in constraints:
+            p1 = x[:, i1]
+            p2 = x[:, i2]
+            diff = p2 - p1
+            dist = torch.norm(diff, dim=1, keepdim=True) + 1e-8
+            delta = diff * (dist_target / dist - 1.0)
+            x[:, i1] -= 0.5 * delta
+            x[:, i2] += 0.5 * delta
+    return x
+
 def main():
     parser = argparse.ArgumentParser()
     
@@ -84,8 +116,8 @@ def main():
     # Sampling args
     parser.add_argument("--n-samples", type=int, default=100)
     parser.add_argument("--batch-size", type=int, default=100)
-    parser.add_argument("--refinement-steps", type=int, default=100)
-    parser.add_argument("--step-size", type=float, default=1e-4) # eta
+    parser.add_argument("--refinement-steps", type=int, default=2000)
+    parser.add_argument("--step-size", type=float, default=1e-5) # Reduced for stability
     parser.add_argument("--temperature", type=float, default=298.0) # Kelvin?
     # Note: Training was on whatever units. If forces are ~1000, energies ~100.
     # We normalized targets.
@@ -95,11 +127,16 @@ def main():
     
     parser.add_argument("--out-dir", type=str, default="runs/loop_b_refinement")
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--warmup-steps", type=int, default=1000, help="Initial steps before energy filtering")
+    parser.add_argument("--keep-percent", type=float, default=1.0, help="Fraction of samples to keep (0.0 < p <= 1.0)")
     
     args = parser.parse_args()
     set_deterministic(args.seed)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     log.info(f"Device: {device}")
+    
+    # Ensure output directory exists
+    Path(args.out_dir).mkdir(parents=True, exist_ok=True)
 
     # 1. Load Diffusion
     # Note: al_3 yaml might have different structure than train_diffusion yaml.
@@ -130,12 +167,24 @@ def main():
     diff_types = torch.load(shard_path)['atom_types'].to(device) # [10]
 
     all_samples = []
+    all_samples = []
+    # Adjust n_batches: If filtering, we process input batch size fully, then reduce.
+    # We still loop based on 'args.n_samples' which we treat as INPUT samples count for generation.
     n_batches = (args.n_samples + args.batch_size - 1) // args.batch_size
     
     log.info(f"Generating {args.n_samples} samples...")
     
+    initial_samples = []
+    refined_samples = []
+    
     for i in range(n_batches):
-        B = min(args.batch_size, args.n_samples - len(all_samples))
+        # Determine current batch size (might be smaller for last batch)
+        # Note: If we just want to process N input samples, we iterate standard way.
+        n_generated = len(initial_samples) # Currently stored 
+        # Wait, simplistic loop is fine. We generate batch, refine, filter, store.
+        
+        B = min(args.batch_size, args.n_samples - (i * args.batch_size))
+        if B <= 0: break
         
         # A. Diffusion
         a_batch = diff_types.unsqueeze(0).expand(B, -1)
@@ -143,56 +192,96 @@ def main():
         
         with torch.no_grad():
             x_10 = diffusion.p_sample_loop(diff_model, shape, a_batch)
+            x_10 = x_10 / diffusion.cfg.scale_factor
             
         # B. Reconstruction (10 -> 22)
         x_22 = align_and_reconstruct(x_10, templ_all, heavy_indices)
         
-        # C. Refinement
-        x_curr = x_22.clone().requires_grad_(True)
+        # Store initial *before* any refinement
+        initial_samples.append(x_22.clone().cpu()) 
         
-        # Optimizer typically better than manual update, but manual Langevin is fine
-        # x_new = x_old - step * grad + sigma * noise
-        # This is Overdamped Langevin.
-        # Temp: If model trained on PE, we need consistent units.
-        # If we just want minimization, set Temp=0.
-        # Let's assume Refinement = Minimization (push to basin bottom) is safer initially.
-        # args.temperature default to 0 effectively?
+        # C. Warmup Phase
+        x_curr = x_22.clone().to(device).requires_grad_(True)
         
-        log.info(f"Batch {i+1}: Refining...")
+        warmup_k = args.warmup_steps
+        main_k = args.refinement_steps - warmup_k
         
-        for k in range(args.refinement_steps):
-            # Energy & Force
-            # Model returns normalized energy
+        if warmup_k > 0:
+            log.info(f"Batch {i+1}: Warmup ({warmup_k} steps)...")
+            for k in range(warmup_k):
+                e_norm = force_model(x_curr)
+                grad = torch.autograd.grad(e_norm.sum(), x_curr)[0]
+                f_pred = -grad * f_stats['e_std']
+                
+                f_norm = f_pred.norm(dim=-1, keepdim=True)
+                clip_coef = torch.clamp(10.0 / (f_norm + 1e-6), max=1.0)
+                f_pred = f_pred * clip_coef
+
+                with torch.no_grad():
+                    x_curr.data += args.step_size * f_pred
+                    x_curr.data = constrain_bonds_22(x_curr.data)
+
+        # D. Filtering
+        if args.keep_percent < 1.0:
+            with torch.no_grad():
+                # Calc energy for filtering
+                e_vals = force_model(x_curr) * f_stats['e_std'] + f_stats['e_mean'] # Denormalized for logging? No, model returns norm.
+                # Just use e_norm for sorting
+                e_norm = force_model(x_curr)
+                
+                k_keep = int(B * args.keep_percent)
+                k_keep = max(1, k_keep) # Keep at least 1
+                
+                # Sort
+                vals, indices = torch.sort(e_norm)
+                keep_idx = indices[:k_keep]
+                
+                log.info(f"Batch {i+1}: Filtering top {args.keep_percent*100}% ({B} -> {k_keep}). Best E={vals[0].item():.2f}, Worst kept={vals[k_keep-1].item():.2f}")
+                
+                # Filter x_curr
+                x_curr = x_curr[keep_idx].detach().clone().requires_grad_(True)
+                
+        # E. Main Refinement Phase
+        log.info(f"Batch {i+1}: Main Refinement ({main_k} steps)...")
+        for k in range(main_k):
             e_norm = force_model(x_curr)
-            # We want Unnormalized Energy gradient?
-            # F = -grad(E_unnorm)
-            # E_unnorm = E_norm * e_std + e_mean
-            # grad(E_unnorm) = grad(E_norm) * e_std
-            
-            # e_norm.sum() for batch grad
             grad = torch.autograd.grad(e_norm.sum(), x_curr)[0]
             f_pred = -grad * f_stats['e_std']
             
-            # Langevin Update
-            # x += s * F + noise
-            # Careful with step size.
-            
+            f_norm = f_pred.norm(dim=-1, keepdim=True)
+            clip_coef = torch.clamp(10.0 / (f_norm + 1e-6), max=1.0)
+            f_pred = f_pred * clip_coef
+
             with torch.no_grad():
-                # Clean update
+                if i == 0 and (k < 5 or k % 5000 == 0 or k == main_k - 1):
+                     log.info(f"Main Step {k}: E_norm={e_norm.mean().item():.2f} | Force_norm_pre={f_norm.mean().item():.2f}")
+                
                 x_curr.data += args.step_size * f_pred
-                if args.temperature > 0:
-                   # This requires kB in compatible units.
-                   # If we don't know units, Temperature is risky.
-                   # Let's stick to Gradient Descent (Minimization) for now.
-                   pass
-                   
-        all_samples.append(x_curr.detach().cpu())
+                x_curr.data = constrain_bonds_22(x_curr.data)
+                    
+        refined_samples.append(x_curr.detach().cpu())
         
-    final_samples = torch.cat(all_samples, dim=0)
-    out_path = Path(args.out_dir) / "refined_samples.pt"
+        # Checkpoint every batch (since batches are large)
+        if (i+1) % 1 == 0:
+            ckpt_data = {
+                "initial_positions": torch.cat(initial_samples, dim=0),
+                "refined_positions": torch.cat(refined_samples, dim=0),
+                "atom_types": diff_types.cpu()
+            }
+            ckpt_path = Path(args.out_dir) / f"checkpoint_batch_{i+1:03d}.pt"
+            torch.save(ckpt_data, ckpt_path)
+            log.info(f"Saved checkpoint to {ckpt_path}")
+        
+    results = {
+        "initial_positions": torch.cat(initial_samples, dim=0),
+        "refined_positions": torch.cat(refined_samples, dim=0),
+        "atom_types": diff_types.cpu()
+    }
+    
+    out_path = Path(args.out_dir) / "refined_results.pt"
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    torch.save(final_samples, out_path)
-    log.info(f"Saved refined samples to {out_path}")
+    torch.save(results, out_path)
+    log.info(f"Saved refined results to {out_path}")
 
 if __name__ == "__main__":
     main()

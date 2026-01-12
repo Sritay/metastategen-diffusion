@@ -2,6 +2,9 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from pathlib import Path
+# Fix for legacy sklearn with new numpy
+if not hasattr(np, 'float'):
+    np.float = float
 from sklearn.cluster import DBSCAN
 from regions import plot_regions
 
@@ -46,7 +49,7 @@ def get_cluster_centers(phi, psi, eps=0.4, min_samples=20, top_n=5):
     return clusters[:top_n], labels
 
 def main():
-    csv_path = Path("demo/evolution_density.csv")
+    csv_path = Path("demo/evolution_data.csv")
     if not csv_path.exists():
         print(f"File not found: {csv_path}")
         return
@@ -59,6 +62,9 @@ def main():
     
     print(f"{'Iter':<5} | {'Cluster':<7} | {'Phi':>7} | {'Psi':>7} | {'Count':>5} | {'Description'}")
     print("-" * 65)
+    
+    cluster_rows = []
+    detailed_rows = []
     
     for i, ax in zip(iters, axes):
         subset = df[df['Iter'] == i]
@@ -109,6 +115,58 @@ def main():
 
             ax.scatter(phi[mask], psi[mask], s=10, alpha=alpha, label=label_text)
             
+            # Add to detailed rows
+            # Find centroid/desc for this label
+            c_phi, c_psi, c_desc, c_rank = np.nan, np.nan, "Noise", -1
+            
+            # Check if it is a top cluster
+            for r, tc in enumerate(top_clusters):
+                 if tc['label'] == lab:
+                     c_phi = tc['phi']
+                     c_psi = tc['psi']
+                     c_rank = r + 1
+                     # Recalculate desc logic (or store it earlier)
+                     cx, cy = c_phi, c_psi
+                     if -100 <= cx <= -40 and -80 <= cy <= -10: desc_ = "Alpha_R"
+                     elif (cx <= -60 or cx >= 150) and (abs(cy) >= 90): desc_ = "Beta/C5"
+                     elif -120 <= cx <= -40 and 0 <= cy <= 100: desc_ = "C7eq"
+                     elif 30 <= cx <= 90 and -90 <= cy <= -30: desc_ = "C7ax"
+                     elif 30 <= cx <= 90 and 0 <= cy <= 80: desc_ = "Alpha_L"
+                     elif -25 <= cx <= 25 and -25 <= cy <= 25: desc_ = "Barrier"
+                     else: desc_ = "Unknown"
+                     c_desc = desc_
+                     break
+            
+            # Add all points in this mask
+            mask_indices = np.where(mask)[0]
+            for idx in mask_indices:
+                detailed_rows.append({
+                    "Iter": i,
+                    "Phi": phi[idx],
+                    "Psi": psi[idx],
+                    "ClusterRank": c_rank if c_rank != -1 else None,
+                    "ClusterLabel": lab,
+                    "ClusterPhi": c_phi,
+                    "ClusterPsi": c_psi,
+                    "Description": c_desc if c_rank != -1 else "Minor/Noise"
+                })
+             
+        # Also handle noise (label -1)
+        noise_mask = labels == -1
+        if np.any(noise_mask):
+             noise_idx = np.where(noise_mask)[0]
+             for idx in noise_idx:
+                 detailed_rows.append({
+                    "Iter": i,
+                    "Phi": phi[idx],
+                    "Psi": psi[idx],
+                    "ClusterRank": None,
+                    "ClusterLabel": -1,
+                    "ClusterPhi": np.nan,
+                    "ClusterPsi": np.nan,
+                    "Description": "Noise"
+                 })
+            
         ax.set_title(f"Iter {i}")
         ax.set_xlabel("Phi")
         if i == iters[0]: ax.set_ylabel("Psi")
@@ -131,11 +189,13 @@ def main():
                 desc = "Alpha_R"
             
             # Beta / C5 / Extended (Top Left & Bottom Left)
-            elif (cx <= -100 or cx >= 150) and (cy >= 90 or cy <= -90):
+            # Expanded definition to catch the -90, 180 region
+            elif (cx <= -60 or cx >= 150) and (abs(cy) >= 90):
                 desc = "Beta/C5"
                 
             # C7eq / Polyproline II (-80, +70)
             elif -120 <= cx <= -40 and 0 <= cy <= 100:
+
                 desc = "C7eq"
                 
             # C7ax / Alpha Left (+60, -70 is Ax, +60, +40 is Alpha_L)
@@ -149,6 +209,16 @@ def main():
                 desc = "Barrier"
 
             print(f"{i:<5} | #{rank+1:<6} | {cx:>7.1f} | {cy:>7.1f} | {int(c['count']):>5} | {desc}")
+            
+            # Collect for CSV
+            cluster_rows.append({
+                "Iter": i,
+                "Rank": rank + 1,
+                "Phi": round(cx, 2),
+                "Psi": round(cy, 2),
+                "Count": int(c['count']),
+                "Description": desc
+            })
 
         # Overlay Regions
         plot_regions(ax)
@@ -164,6 +234,18 @@ def main():
     out_file_pdf = Path("demo") / "cluster_analysis.pdf"
     plt.savefig(out_file_pdf, dpi=300, format='pdf')
     print(f"Saved plot to {out_file_pdf}")
+
+    # Save CSV
+    if cluster_rows:
+        csv_out = Path("demo") / "cluster_analysis.csv"
+        pd.DataFrame(cluster_rows).to_csv(csv_out, index=False)
+        print(f"Saved CSV to {csv_out}")
+
+    # Save detailed assignments
+    if detailed_rows:
+        assign_out = Path("demo") / "cluster_assignments.csv"
+        pd.DataFrame(detailed_rows).to_csv(assign_out, index=False)
+        print(f"Saved Assignments CSV to {assign_out}")
 
 if __name__ == "__main__":
     main()

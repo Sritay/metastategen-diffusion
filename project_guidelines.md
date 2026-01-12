@@ -44,6 +44,21 @@ We strictly separate the sources for generic sampling vs. force training due to 
     *   *Alternative:* Use a **"Dataset Oracle"** (Nearest Neighbor in a hidden pool) to simulate expensive physical relaxations during Active Learning experiments.
 *   **Visuals:** `matplotlib` for all plots.
 
+### 2.4 Physical Consistency & Bond Constraints (CRITICAL UPDATE)
+*   **Problem:** The diffusion model, when learning only on 10 atoms with a large connectivity radius (RBF > 1.5nm), failed to maintain rigid covalent geometry, leading to "exploding" atoms (bonds > 50nm).
+*   **Solution:** We enforce **Hard Bond Constraints** during the diffusion sampling process.
+    *   **Scope:** All 9 covalent bonds between the 10 heavy atoms are rigidly projected to standard template lengths at *every* denoising step.
+    *   **Effect:** The model focuses solely on learning the flexible torsional degrees of freedom ($\phi, \psi$). This completely eliminates the "exploded structure" artifact.
+    *   **Implementation:** `src/metastategen/models/diffusion.py` :: `constrain_bonds`.
+
+### 2.5 Refinement & Visualization
+*   **Workflow:** Generation $\to$ Reconstruction (H-placement) $\to$ Filtering (Top 1% by Energy) $\to$ Force Refinement.
+*   **PDB Export Standard:**
+    *   **Atom Ordering:** Must match the `mdshare` / `timewarp` template exactly.
+    *   **Correct Order:** `H1, CH3, H2, H3, C, O, N, H, CA...` (starts with Methyl Hydrogens).
+    *   **Incorrect Order:** `CH3, H1...` (starts with Carbon).
+    *   *Warning:* Incorrect ordering causes visualization tools (PyMOL) to draw bonds wildly incorrectly.
+
 ---
 
 ## 3. The 14-Day Implementation Plan

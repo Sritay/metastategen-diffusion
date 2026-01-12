@@ -5,7 +5,7 @@ from pathlib import Path
 def main():
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument("--run", type=str, default="runs/day10_al_5_hpc")
+    parser.add_argument("--run", type=str, default="runs/day11_al_23_hpc")
     args = parser.parse_args()
 
     path = Path(args.run) / "al_metrics.csv"

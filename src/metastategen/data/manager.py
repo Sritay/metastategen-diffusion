@@ -14,7 +14,7 @@ log = get_logger("data_manager")
 class PositionsDataset(Dataset):
     """Simple dataset wrapper for positions + atom types."""
 
-    def __init__(self, data: dict[str, torch.Tensor]) -> None:
+    def __init__(self, data: dict[str, torch.Tensor], scale_factor: float = 1.0) -> None:
         if "positions" not in data or "atom_types" not in data:
             raise KeyError("data must include positions and atom_types")
         self.positions = data["positions"]
@@ -22,12 +22,13 @@ class PositionsDataset(Dataset):
         self.traj_id = data.get("traj_id")
         self.frame_id = data.get("frame_id")
         self.source_index = data.get("source_index")
+        self.scale_factor = scale_factor
 
     def __len__(self) -> int:
         return int(self.positions.shape[0])
 
     def __getitem__(self, idx: int) -> dict[str, torch.Tensor]:
-        out = {"x": self.positions[idx], "a": self.atom_types}
+        out = {"x": self.positions[idx] * self.scale_factor, "a": self.atom_types}
         if self.traj_id is not None:
             out["t"] = self.traj_id[idx]
         if self.frame_id is not None:
@@ -76,11 +77,12 @@ def merge_al_data(datasets: list[dict[str, torch.Tensor]]) -> dict[str, torch.Te
 class ALDataManager:
     """Tracks cumulative AL data (seed + acquired) for training."""
 
-    def __init__(self, seed_data: dict[str, torch.Tensor]) -> None:
+    def __init__(self, seed_data: dict[str, torch.Tensor], scale_factor: float = 1.0) -> None:
         if "positions" not in seed_data or "atom_types" not in seed_data:
             raise KeyError("seed_data must include positions and atom_types")
         self.atom_types = seed_data["atom_types"]
         self._datasets: list[dict[str, torch.Tensor]] = [seed_data]
+        self.scale_factor = scale_factor
 
     def append(self, new_data: dict[str, torch.Tensor]) -> None:
         if not torch.equal(self.atom_types, new_data["atom_types"]):
@@ -91,7 +93,7 @@ class ALDataManager:
         return merge_al_data(self._datasets)
 
     def dataset(self) -> PositionsDataset:
-        return PositionsDataset(self.cumulative_data())
+        return PositionsDataset(self.cumulative_data(), scale_factor=self.scale_factor)
 
     def size(self) -> int:
         return int(sum(d["positions"].shape[0] for d in self._datasets))
