@@ -2,7 +2,7 @@
 #SBATCH --partition=gpu
 #SBATCH --gpus=1
 #SBATCH --qos=gpu-shd
-#SBATCH --account=e760
+#SBATCH --account=<YOUR_BUDGET_CODE>
 #SBATCH --job-name=refine-23
 #SBATCH --time=12:00:00
 #SBATCH --output=slurm-refine-23-%j.out

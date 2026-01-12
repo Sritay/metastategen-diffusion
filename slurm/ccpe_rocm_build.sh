@@ -2,7 +2,7 @@
 #SBATCH --job-name=ccpe-rocm-build
 #SBATCH --ntasks=8
 #SBATCH --time=00:50:00
-#SBATCH --account=e760
+#SBATCH --account=<YOUR_BUDGET_CODE>
 #SBATCH --partition=serial
 #SBATCH --qos=serial
 #SBATCH --export=none

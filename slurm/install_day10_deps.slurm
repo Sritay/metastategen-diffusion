@@ -4,7 +4,7 @@
 #SBATCH --time=00:20:00
 #SBATCH --partition=serial
 #SBATCH --qos=serial
-#SBATCH --account=e760
+#SBATCH --account=<YOUR_BUDGET_CODE>
 #SBATCH --export=none
 set -euo pipefail
 

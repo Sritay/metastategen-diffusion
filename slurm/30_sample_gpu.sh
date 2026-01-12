@@ -2,7 +2,7 @@
 #SBATCH --partition=gpu
 #SBATCH --gpus=1
 #SBATCH --qos=gpu-shd
-#SBATCH --account=e760
+#SBATCH --account=<YOUR_BUDGET_CODE>
 #SBATCH --job-name=msgen-sample
 #SBATCH --time=00:20:00
 

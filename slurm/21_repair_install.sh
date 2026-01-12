@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --partition=serial
 #SBATCH --qos=serial
-#SBATCH --account=e760
+#SBATCH --account=<YOUR_BUDGET_CODE>
 #SBATCH --job-name=msgen-repair
 #SBATCH --time=00:20:00
 #SBATCH --ntasks=1
