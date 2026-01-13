@@ -61,7 +61,9 @@ def verify_forces(npz_path: Path) -> None:
             raise ValueError(f"Forces arr_{i} expected float dtype, got {a.dtype}")
     log.info(f"Verified forces: {[a.shape for a in arrs]} (keys={keys})")
 
-def select_indices(T: int, stride: int, max_frames: int | None, seed: int, random_subset: bool) -> np.ndarray:
+from typing import Optional
+
+def select_indices(T: int, stride: int, max_frames: Optional[int], seed: int, random_subset: bool) -> np.ndarray:
     """Duplicate of scripts/preprocess_positions.py logic to ensure alignment."""
     if stride <= 0:
         raise ValueError("stride must be positive")

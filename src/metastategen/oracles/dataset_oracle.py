@@ -14,10 +14,12 @@ log = get_logger("dataset_oracle")
 class DatasetOracle(Oracle):
     """Oracle that snaps candidates to nearest neighbors in a reference pool."""
 
+from typing import Union
+
     def __init__(
         self,
-        pool_path: str | Path,
-        device: torch.device | str = "cpu",
+        pool_path: Union[str, Path],
+        device: Union[torch.device, str] = "cpu",
         batch_size: int = 100,
     ) -> None:
         self.pool_path = Path(pool_path)

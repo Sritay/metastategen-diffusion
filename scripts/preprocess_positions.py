@@ -68,7 +68,9 @@ def recenter_positions(x: np.ndarray) -> np.ndarray:
     centroid = np.mean(x, axis=1, keepdims=True)
     return (x - centroid).astype(np.float32)
 
-def select_indices(T: int, stride: int, max_frames: int | None, seed: int, random_subset: bool) -> np.ndarray:
+from typing import Optional
+
+def select_indices(T: int, stride: int, max_frames: Optional[int], seed: int, random_subset: bool) -> np.ndarray:
     if stride <= 0:
         raise ValueError("stride must be positive")
     base = np.arange(0, T, stride, dtype=np.int64)

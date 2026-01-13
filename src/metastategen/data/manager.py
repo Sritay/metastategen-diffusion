@@ -38,7 +38,9 @@ class PositionsDataset(Dataset):
         return out
 
 
-def load_al_data(path: str | Path) -> dict[str, torch.Tensor]:
+from typing import Union
+
+def load_al_data(path: Union[str, Path]) -> dict[str, torch.Tensor]:
     path = Path(path)
     if not path.exists():
         raise FileNotFoundError(path)

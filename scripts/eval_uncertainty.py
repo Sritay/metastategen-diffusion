@@ -23,7 +23,9 @@ def _load_uncertainty(path: Path) -> np.ndarray:
     return np.asarray(u)
 
 
-def _load_gen_phi_psi(gen_dihedrals: Path | None, samples: Path | None, pdb_path: Path) -> np.ndarray:
+from typing import Optional
+
+def _load_gen_phi_psi(gen_dihedrals: Optional[Path], samples: Optional[Path], pdb_path: Path) -> np.ndarray:
     if gen_dihedrals is not None:
         with np.load(gen_dihedrals) as f:
             if "phi_psi" not in f:

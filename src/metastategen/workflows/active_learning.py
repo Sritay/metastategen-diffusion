@@ -257,7 +257,7 @@ def _sample_candidates(
     batch_size: int,
     steps: int,
     eta: float,
-    condition: torch.Tensor | dict = None,
+    condition: Union[torch.Tensor, dict] = None,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     ensemble.eval()
     device = diffusion.betas.device
@@ -341,7 +341,9 @@ def _evaluate(
     cfg: dict,
     iter_dir: Path,
     seed: int,
-    condition: torch.Tensor | dict = None,
+from typing import Union
+
+    condition: Union[torch.Tensor, dict] = None,
 ) -> dict:
     al_cfg = cfg.get("active_learning", {})
     n_eval = int(al_cfg.get("eval_samples", 1000))
