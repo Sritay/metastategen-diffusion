@@ -26,47 +26,53 @@ math: mathjax
     ```
 
 2.  **Environment Setup**
-    Create a fresh virtual environment:
+    We recommended using `venv` or `conda` with **Python 3.10+**.
+
     ```bash
+    # Create environment
     python -m venv .venv
     source .venv/bin/activate
-    ```
 
-3.  **Install Package**
-    Install the package in editable mode to enable the `msgen` CLI:
-    ```bash
+    # Install dependencies (ROCm/CUDA version may vary)
+    # See slurm/pip-install.sh for exact versions used on HPC
+    pip install "numpy<2" scipy matplotlib pyyaml tqdm rich mdshare pandas wandb
+    pip install torch torchvision --index-url https://download.pytorch.org/whl/rocm5.6
+    
+    # Install Package (Editable mode)
     pip install -e .
     ```
-    *Note: For HPC environments (ROCm), ensure you load appropriate modules (see `slurm/pip-install.sh`) or install the PyTorch ROCm version manually.*
 
 ---
 
 ## Running the Code
 
-You can run the project using either the **CLI** (`msgen`) or the **Scripts** (for existing SLURM workflows).
+### 1. Active Learning Loop (Loop 24)
+To run the latest Active Learning iteration (Loop 24):
 
-### Option A: Using the CLI (`msgen`)
-
-The `msgen` command is the main entry point for local development and new workflows.
-
-**1. Training Diffusion Model**
+**Via SLURM (HPC):**
 ```bash
-msgen train --config configs/ala2_default.yaml
+sbatch slurm/92_train_loop_24.sh
 ```
 
-**2. Active Learning Loop**
-Runs the full AL loop (Ensemble Training -> Acquisition -> Oracle -> Retraining).
+**Via Python (Local/Debug):**
 ```bash
-msgen al --config configs/ala2_al.yaml
+python scripts/run_al_loop.py --config configs/ala2_al_24_hpc.yaml
 ```
 
-**3. Sampling & Refinement**
-Generates structures using a trained diffusion model and refines them with the pairwise force field.
+### 2. Refinement Loop (Loop 23)
+To run the latest Refinement process (Loop 23 with fixed constraints):
+
+**Via SLURM (HPC):**
 ```bash
-msgen sample \
-    --diff-ckpt runs/day8_9_al_3/members/m000/checkpoints/iter_03.pt \
+sbatch slurm/93_refine_loop_23_fixed.sh
+```
+
+**Via Python (Local/Debug):**
+```bash
+python scripts/sample_refined.py \
+    --diff-ckpt runs/day11_al_23_hpc/members/m000/checkpoints/curr_ckpt.pt \
     --force-ckpt runs/energy_pairwise/best_model.pt \
-    --out-dir runs/my_refined_test \
+    --out-dir runs/loop_b_refinement_23_fixed \
     --n-samples 1000
 ```
 
@@ -107,27 +113,7 @@ python scripts/analysis/viz_funnel.py \
 
 ---
 
-### Option B: Python Scripts (SLURM / HPC)
 
-For compatibility with existing `slurm/*.sh` scripts, the original python scripts in the `scripts/` directory are maintained as wrappers. These function identically to the CLI commands.
-
-**1. Active Learning Loop**
-```bash
-# SLURM
-sbatch slurm/92_train_loop_24.sh
-
-# Python
-python scripts/run_al_loop.py --config configs/ala2_al_24_hpc.yaml
-```
-
-**2. Refinement Loop**
-```bash
-# SLURM
-sbatch slurm/93_refine_loop_23_fixed.sh
-
-# Python
-python scripts/sample_refined.py --diff-ckpt ... --force-ckpt ...
-```
 
 ---
 
