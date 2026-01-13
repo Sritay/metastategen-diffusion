@@ -28,8 +28,8 @@ To run the latest Refinement process (Loop 23 with fixed constraints):
 ### Via CLI (Local/Debug)
 ```bash
 msgen sample \
-    --diff-ckpt runs/day11_al_23_hpc/members/m000/checkpoints/curr_ckpt.pt \
-    --force-ckpt runs/energy_pairwise/best_model.pt \
+    --diff-ckpt models/pretrained/diffusion_model.pt \
+    --force-ckpt models/pretrained/force_field.pt \
     --out-dir runs/loop_b_refinement_23_fixed \
     --n-samples 1000 \
     --batch-size 100 \

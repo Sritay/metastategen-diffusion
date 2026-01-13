@@ -31,7 +31,7 @@ Refines a small batch of 10 samples for 50 steps.
 ```bash
 msgen sample \
     --diff-ckpt runs/tiny_al_test/members/m000/checkpoints/iter_00.pt \
-    --force-ckpt runs/energy_pairwise/best_model.pt \
+    --force-ckpt models/pretrained/force_field.pt \
     --out-dir runs/tiny_sample_test \
     --n-samples 10 \
     --refinement-steps 50 \

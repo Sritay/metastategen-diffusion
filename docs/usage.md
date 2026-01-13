@@ -11,16 +11,7 @@ math: mathjax
 
 ---
 
----
-layout: default
-title: Usage Guide
-nav_order: 5
-has_children: true
----
 
-# Usage Guide
-
-[< Back: Implementation](implementation.md) | [Back to Home >](index.md)
 
 ---
 
@@ -34,6 +25,10 @@ Please select a topic from below or the sidebar:
 
 ---
 
-[< Back: Implementation](implementation.md) | [Back to Home >](index.md)
+
+
+
+
+---
 
 [< Back: Implementation](implementation.md) | [Back to Home >](index.md)

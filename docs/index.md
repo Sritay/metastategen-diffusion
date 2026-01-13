@@ -46,8 +46,12 @@ We combine **Geometric Deep Learning (EGNN)** for capturing molecular symmetries
 *   **Datasets**: MDShare vs Timewarp.
 
 ### [4. Usage Guide](usage.md)
-*   **Installation**: Getting started.
-*   **Running**: SLURM commands for training and sampling.
+### [4. Usage Guide](usage.md)
+*   **Installation**: Setup and Data Download.
+*   **Verification**: Fast sanity checks.
+*   **Workflows**: Training, Active Learning, and Refinement.
+*   **Analysis**: Visualization and metrics.
+*   **Configuration**: Full reference.
 
 ---
 
