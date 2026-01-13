@@ -31,3 +31,16 @@ pip install -e .
 
 > [!NOTE]
 > For **HPC / ROCm** environments, you may need to install a specific PyTorch version *before* running the above command to avoid overwriting it with the PyPI default. See `slurm/pip-install.sh` for reference.
+
+## 3. Download Data
+The project requires molecular dynamics data (Alanine Dipeptide) which is not included in the repository. Run the provided script to fetch and process it:
+
+```bash
+python scripts/get_mdshare_data.py
+python scripts/preprocess_positions.py
+python scripts/setup_al_split.py
+```
+This sequence:
+1. Downloads raw MD data to `data/raw`.
+2. Processes it into unified PyTorch shards in `data/processed/ala2`.
+3. Generates the Seed, Pool, and Validation splits required for Active Learning.
