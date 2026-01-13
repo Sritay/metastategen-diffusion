@@ -17,12 +17,12 @@ Before the loop begins, we initialize an **Ensemble** of $M$ probabilistic model
 *   **Function**: `_train_member`
 *   **Process**: Each member is an EGNN-based Diffusion Model. They are trained independently on the initial seed dataset (MDShare data, 10-atom backbone).
 *   **Diversity**: Diversity is induced by random initialization seeds and random dataloader shuffling. This ensures that in regions of dense data, models agree, while in unexplored regions, their predictions diverge.
-*   **Training Objective**: Standard Denoising Diffusion objective: $\mathbb{E}_{t, x_0, \epsilon} [ \lVert \epsilon - \epsilon_\theta(x_t, t) \rVert^2 ]$.
+*   **Training Objective**: Standard Denoising Diffusion objective: $\mathbb{E}_{t, x\_0, \epsilon} [ \lVert \epsilon - \epsilon\_\theta(x\_t, t) \rVert^2 ]$.
 
 ### Step 1: Candidate Generation (Consensus Sampling)
 *   **Function**: `_sample_candidates` calls `_consensus_ddpm` or `_consensus_ddim`.
 *   **Logic**: We generate a large pool of candidates (e.g., $N=1000$) to explore the landscape.
-*   **Consensus Mechanism**: instead of generating from a single model, we use the **Mean** of the predicted noise from all ensemble members to guide the trajectory: $\bar{\epsilon}_\theta(x_t, t) = \frac{1}{M} \sum_{i=1}^M \epsilon_{\theta_i}(x_t, t)$. This stabilizes generation.
+*   **Consensus Mechanism**: instead of generating from a single model, we use the **Mean** of the predicted noise from all ensemble members to guide the trajectory: $\bar{\epsilon}\_\theta(x\_t, t) = \frac{1}{M} \sum_{i=1}^M \epsilon_{\theta_i}(x\_t, t)$. This stabilizes generation.
 *   **Uncertainty Estimation**: Simultaneously, we compute the **Variance** of the noise predictions: $\mathbb{V}[\epsilon] = \frac{1}{M-1} \sum (\epsilon_i - \bar{\epsilon})^2$. This variance is summed over the diffusion trajectory to produce a single scalar "Uncertainty Score" for each generated structure.
 
 ### Step 2: Acquisition (Active Selection)
