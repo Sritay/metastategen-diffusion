@@ -17,6 +17,7 @@ model:
   n_layers: 2
   hidden_dim: 32
   time_emb_dim: 32
+  use_chiral_features: true
 
 diffusion:
   T: 50
