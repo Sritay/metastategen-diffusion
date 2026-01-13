@@ -18,6 +18,12 @@ This project aims to generate physically valid, low-energy metastable states of 
 
 We combine **Geometric Deep Learning (EGNN)** for capturing molecular symmetries with **Active Learning** to iteratively explore the conformational landscape.
 
+<div align="center">
+  <img src="assets/movie.gif" alt="Generated Structures" width="60%">
+  <br>
+  <em><strong>Figure 1: Generation in Action.</strong> The diffusion model generates diverse 10-atom backbones which are then reconstructed and refined into full all-atom structures.</em>
+</div>
+
 ---
 
 ## 📚 Documentation Contents
