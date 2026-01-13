@@ -15,7 +15,7 @@ Before the loop begins, we initialize an **Ensemble** of $M$ probabilistic model
 *   **Function**: `_train_member`
 *   **Process**: Each member is an EGNN-based Diffusion Model. They are trained independently on the initial seed dataset (MDShare data, 10-atom backbone).
 *   **Diversity**: Diversity is induced by random initialization seeds and random dataloader shuffling. This ensures that in regions of dense data, models agree, while in unexplored regions, their predictions diverge.
-*   **Training Objective**: Standard Denoising Diffusion objective: $\mathbb{E}_{t, x_0, \epsilon} [ \| \epsilon - \epsilon_\theta(x_t, t) \|^2 ]$.
+*   **Training Objective**: Standard Denoising Diffusion objective: $\mathbb{E}_{t, x_0, \epsilon} [ \lVert \epsilon - \epsilon_\theta(x_t, t) \rVert^2 ]$.
 
 ### Step 1: Candidate Generation (Consensus Sampling)
 *   **Function**: `_sample_candidates` calls `_consensus_ddpm` or `_consensus_ddim`.
