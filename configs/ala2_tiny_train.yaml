@@ -1,0 +1,28 @@
+
+data:
+  seed_path: "data/processed/ala2/al_seed.pt"
+  pool_path: "data/processed/ala2/al_pool_ref.pt"
+  val_path: "data/processed/ala2/al_val.pt"
+  meta_path: "data/processed/ala2/meta.pt"
+  batch_size: 16
+  num_workers: 0
+
+model:
+  type: "egnn"
+  n_layers: 2
+  hidden_dim: 32
+  time_emb_dim: 32
+
+diffusion:
+  T: 100
+  beta_start: 0.0001
+  beta_end: 0.02
+  schedule: "cosine"
+  recenter_every_step: True
+
+train:
+  seed: 42
+  epochs: 1
+  lr: 3.0e-4
+  grad_clip: 1.0
+  rot_aug: true
