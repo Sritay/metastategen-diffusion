@@ -1,6 +1,7 @@
 # MetaStateGen-Diffusion
 
 Metastable state generation with equivariant diffusion for molecular dynamics.
+**[📘 Full Documentation Website](https://sritay.github.io/metastategen-diffusion/)**
 
 ## Overview
 
@@ -36,33 +37,7 @@ We combine **Geometric Deep Learning (EGNN)** for capturing molecular symmetries
 
 ## Usage
 
-### 1. Core Workflows (Scripts)
-The primary workflows are currently run via python scripts in `scripts/`. These act as wrappers around the core library logic and are fully compatible with existing SLURM submission scripts.
-
-**Training:**
-```bash
-python scripts/train_diffusion.py --config configs/ala2_default.yaml
-```
-
-**Active Learning Loop:**
-```bash
-python scripts/run_al_loop.py --config configs/ala2_al.yaml
-```
-
-**Sampling & Refinement:**
-```bash
-python scripts/sample_refined.py --diff-ckpt runs/best_model.pt --force-ckpt runs/energy_model.pt
-```
-
-### 2. CLI (Reporting)
-Installing the package (`pip install -e .`) provides the `msgen` command line tool. Currently, this is used for generating evaluation reports:
-
-```bash
-# Generate Reference Plots
-msgen report --dihedrals data/processed/ala2/dihedrals.npz --outdir reports/reference
-```
-
-*(Note: `train`, `sample`, and `al` subcommands are reserved for future CLI integration.)*
+Please refer to the **[Usage Guide](https://sritay.github.io/metastategen-diffusion/usage.html)** on our documentation website for detailed installation, training, and sampling instructions.
 
 ## Structure
 
