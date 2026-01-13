@@ -7,7 +7,7 @@ from pathlib import Path
 import numpy as np
 import torch
 import yaml
-, Optional
+from typing import Union, Optional
 
 from metastategen.active_learning import select_acquisition
 try:
