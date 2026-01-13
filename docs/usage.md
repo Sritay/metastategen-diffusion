@@ -33,47 +33,55 @@ math: mathjax
     python -m venv .venv
     source .venv/bin/activate
 
-    # Install dependencies (ROCm/CUDA version may vary)
-    # See slurm/pip-install.sh for exact versions used on HPC
-    pip install "numpy<2" scipy matplotlib pyyaml tqdm rich mdshare pandas wandb
-    pip install torch torchvision --index-url https://download.pytorch.org/whl/rocm5.6
-    
+    # Upgrade pip (Required for pyproject.toml support)
+    pip install --upgrade pip
+
     # Install Package (Editable mode)
+    # This automatically installs dependencies (numpy, torch, etc.) defined in pyproject.toml
     pip install -e .
     ```
+
+    *> [!NOTE]*
+    *> For **HPC / ROCm** environments, you may need to install a specific PyTorch version *before* running the above command to avoid overwriting it with the PyPI default. See `slurm/pip-install.sh` for reference.*
 
 ---
 
 ## Running the Code
 
+The primary way to interact with the project is via the `msgen` Command Line Interface (CLI).
+
 ### 1. Active Learning Loop (Loop 24)
 To run the latest Active Learning iteration (Loop 24):
+
+**Via CLI (Local/Debug):**
+```bash
+msgen al --config configs/ala2_al_24_hpc.yaml
+```
 
 **Via SLURM (HPC):**
 ```bash
 sbatch slurm/92_train_loop_24.sh
 ```
 
-**Via Python (Local/Debug):**
-```bash
-python scripts/run_al_loop.py --config configs/ala2_al_24_hpc.yaml
-```
-
 ### 2. Refinement Loop (Loop 23)
 To run the latest Refinement process (Loop 23 with fixed constraints):
+
+**Via CLI (Local/Debug):**
+```bash
+msgen sample \
+    --diff-ckpt runs/day11_al_23_hpc/members/m000/checkpoints/curr_ckpt.pt \
+    --force-ckpt runs/energy_pairwise/best_model.pt \
+    --out-dir runs/loop_b_refinement_23_fixed \
+    --n-samples 1000 \
+    --batch-size 100 \
+    --warmup-steps 1000 \
+    --refinement-steps 50000 \
+    --keep-percent 0.01 
+```
 
 **Via SLURM (HPC):**
 ```bash
 sbatch slurm/93_refine_loop_23_fixed.sh
-```
-
-**Via Python (Local/Debug):**
-```bash
-python scripts/sample_refined.py \
-    --diff-ckpt runs/day11_al_23_hpc/members/m000/checkpoints/curr_ckpt.pt \
-    --force-ckpt runs/energy_pairwise/best_model.pt \
-    --out-dir runs/loop_b_refinement_23_fixed \
-    --n-samples 1000
 ```
 
 ## Analysis & Visualization
@@ -113,17 +121,31 @@ python scripts/analysis/viz_funnel.py \
 
 ---
 
+## Configuration Reference
 
+Key parameters in `configs/*.yaml`:
 
----
+### Active Learning (`ala2_al_24_hpc.yaml`)
+*   `active_learning.n_iters`: Number of AL iterations (Default: 20).
+*   `active_learning.n_acquire`: Candidates to label per iteration (Default: 500).
+*   `active_learning.acquisition_strategy`: Strategy to select candidates (e.g., `uncertainty`).
+*   `model.rbf_cutoff`: Cutoff distance for EGNN edges (Default: 10.0).
+*   `train.finetune_epochs`: Epochs to retrain per iteration (Default: 20).
 
-## Configuration
+### Diffusion (`ala2_default.yaml`)
+*   `diffusion.T`: Total diffusion steps (Default: 1000).
+*   `diffusion.schedule`: Noise schedule (e.g., `cosine`).
 
-Configuration is handled via YAML files in `configs/`.
+## CLI Reference (`msgen sample`)
 
-*   **`configs/ala2_default.yaml`**: Standard diffusion training.
-*   **`configs/ala2_al.yaml`**: Active Learning configuration (oracle, acquisition, ensemble size).
-*   **`configs/ala2_energy.yaml`**: Pairwise energy model training.
+| Argument | Description | Default |
+| :--- | :--- | :--- |
+| `--diff-ckpt` | Path to trained Diffusion checkpoint | Required |
+| `--force-ckpt` | Path to trained Force/Energy checkpoint | Required |
+| `--refinement-steps` | Number of Langevin dynamics steps | 2000 |
+| `--warmup-steps` | Steps with bond constraints enabled | 1000 |
+| `--step-size` | Langevin step size | 1e-5 |
+| `--keep-percent` | Fraction of lowest energy structures to keep | 1.0 (100%) |
 
 ---
 
