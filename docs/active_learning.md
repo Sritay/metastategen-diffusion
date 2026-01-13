@@ -39,11 +39,16 @@ Before the loop begins, we initialize an **Ensemble** of $M$ probabilistic model
 *   **Visualization**:
 
 ![Acquisition Strategy](assets/acquisition_strategy.png)
-*Figure 1: The AL loop acquiring new points (Red) in unvisited regions (White/Empty space) compared to the initial seed (Black) and previous iterations (Green).*
+*Figure 2: The AL loop acquiring new points (Red) in unvisited regions (White/Empty space) compared to the initial seed (Black) and previous iterations (Green).*
 
 ### Step 4: Retraining
 *   **Process**: The newly labeled Oracle structures are added to the training set (`ALDataManager`).
+*   **Process**: The newly labeled Oracle structures are added to the training set (`ALDataManager`).
 *   **Fine-tuning**: The ensemble members are fine-tuned for a few epochs on this augmented dataset, incorporating the new knowledge.
+
+### Results
+![Evolution Density](assets/evolution_density_iter20.png)
+*Figure 3: Density of generated backbone structures after 20 iterations of Active Learning (Blues), overlaid on ground truth Ramachandran regions (Contours). The model successfully explores and covers the major metastable basins (Alpha, Beta, C7eq).*
 
 ---
 
