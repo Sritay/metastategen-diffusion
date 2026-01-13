@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 import torch
@@ -68,7 +68,7 @@ def recenter_positions(x: np.ndarray) -> np.ndarray:
     centroid = np.mean(x, axis=1, keepdims=True)
     return (x - centroid).astype(np.float32)
 
-from typing import Optional
+
 
 def select_indices(T: int, stride: int, max_frames: Optional[int], seed: int, random_subset: bool) -> np.ndarray:
     if stride <= 0:

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Union
 
 import torch
 
@@ -14,7 +14,7 @@ log = get_logger("dataset_oracle")
 class DatasetOracle(Oracle):
     """Oracle that snaps candidates to nearest neighbors in a reference pool."""
 
-from typing import Union
+
 
     def __init__(
         self,

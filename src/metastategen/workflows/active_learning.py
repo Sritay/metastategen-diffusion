@@ -7,6 +7,7 @@ from pathlib import Path
 import numpy as np
 import torch
 import yaml
+, Optional
 
 from metastategen.active_learning import select_acquisition
 try:
@@ -341,8 +342,6 @@ def _evaluate(
     cfg: dict,
     iter_dir: Path,
     seed: int,
-from typing import Union
-
     condition: Union[torch.Tensor, dict] = None,
 ) -> dict:
     al_cfg = cfg.get("active_learning", {})

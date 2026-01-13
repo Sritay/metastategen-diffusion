@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Iterable, Optional
+from typing import Iterable, Optional, Union
 
 import torch
 from torch.utils.data import Dataset
@@ -38,7 +38,7 @@ class PositionsDataset(Dataset):
         return out
 
 
-from typing import Union
+
 
 def load_al_data(path: Union[str, Path]) -> dict[str, torch.Tensor]:
     path = Path(path)

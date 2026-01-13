@@ -4,6 +4,7 @@ from pathlib import Path
 
 import numpy as np
 import torch
+from typing import Optional
 
 from metastategen.utils import get_logger
 from metastategen.eval.coverage import kl_from_phi_psi
@@ -23,7 +24,7 @@ def _load_uncertainty(path: Path) -> np.ndarray:
     return np.asarray(u)
 
 
-from typing import Optional
+
 
 def _load_gen_phi_psi(gen_dihedrals: Optional[Path], samples: Optional[Path], pdb_path: Path) -> np.ndarray:
     if gen_dihedrals is not None:
