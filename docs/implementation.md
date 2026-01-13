@@ -43,7 +43,7 @@ The diffusion model learns to predict the noise $\epsilon$ added to a structure.
 *   **Layers**: 6 Layers.
 *   **Hidden Dimension**: 128 or 256 channels.
 *   **Update Mechanism**:
-    1.  **Edge Update**: $m_{ij} = \phi_e(h_i, h_j, \|r_i - r_j\|^2, \text{emb}(t))$
+    1.  **Edge Update**: $m_{ij} = \phi_e(h_i, h_j, \lVert r_i - r_j \rVert^2, \text{emb}(t))$
     2.  **Coordinate Update**: $r_i^{l+1} = r_i^l + \sum_{j} (r_i - r_j) \phi_x(m_{ij})$
     3.  **Node Update**: $h_i^{l+1} = \phi_h(h_i, \sum_j m_{ij})$
 *   **Conditioning**:

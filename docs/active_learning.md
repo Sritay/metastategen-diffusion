@@ -6,6 +6,8 @@ nav_order: 2
 
 # Active Learning Loop (Backbone Generation)
 
+[< Back: Home](index.md) | [Next: Refinement >](refinement.md)
+
 **Primary Script**: [`scripts/run_al_loop.py`](../scripts/run_al_loop.py)
 
 The Active Learning (AL) loop is the exploration engine. It iteratively improves a diffusion model by actively seeking out "uncertain" or novel structures.
