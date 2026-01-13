@@ -30,7 +30,7 @@ To run the latest Refinement process (Loop 23 with fixed constraints):
 msgen sample \
     --diff-ckpt models/pretrained/diffusion_model.pt \
     --force-ckpt models/pretrained/force_field.pt \
-    --out-dir runs/loop_b_refinement_23_fixed \
+    --out-dir runs/my_refinement_experiment \
     --n-samples 1000 \
     --batch-size 100 \
     --warmup-steps 1000 \
