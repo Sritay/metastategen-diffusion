@@ -1,6 +1,6 @@
 
 data:
-  data_dir: "data/processed/ala2"
+  data_dir: "data/processed/ala2/shards"
   train_trajs: [0, 1, 2]
   frame_subsample: 10
   seed_path: "data/processed/ala2/al_seed.pt"
