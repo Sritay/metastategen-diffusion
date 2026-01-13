@@ -1,5 +1,8 @@
 
 data:
+  data_dir: "data/processed/ala2"
+  train_trajs: [0, 1, 2]
+  frame_subsample: 10
   seed_path: "data/processed/ala2/al_seed.pt"
   pool_path: "data/processed/ala2/al_pool_ref.pt"
   val_path: "data/processed/ala2/al_val.pt"
@@ -21,6 +24,8 @@ diffusion:
   recenter_every_step: True
 
 train:
+  out_dir: "runs/tiny_train_test"
+  save_every: 1
   seed: 42
   epochs: 1
   lr: 3.0e-4
