@@ -13,6 +13,9 @@ has_children: false
 
 Welcome to the **MetaStateGen Diffusion** project documentation.
 
+> [!IMPORTANT]
+> **Project Status**: This research software is currently under active development. Features, APIs, and documentation are undergoing frequent updates and are subject to change.
+
 ## Project Goal
 This project aims to generate physically valid, low-energy metastable states of peptides (focusing on Alanine Dipeptide) using a novel **Active Learning + Diffusion** approach.
 

@@ -3,6 +3,9 @@
 Metastable state generation with equivariant diffusion for molecular dynamics.
 **[📘 Full Documentation Website](https://sritay.github.io/metastategen-diffusion/)**
 
+> [!IMPORTANT]
+> **Project Status**: This research software is currently under active development. Features, APIs, and documentation are undergoing frequent updates and are subject to change.
+
 ## Overview
 
 This project aims to generate phsycially valid, low-energy metastable states of peptides (focusing on Alanine Dipeptide) using a novel **Active Learning + Diffusion** approach.
