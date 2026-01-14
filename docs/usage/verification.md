@@ -2,7 +2,7 @@
 layout: default
 title: Verification (Small Runs)
 parent: Usage Guide
-nav_order: 5
+nav_order: 2
 ---
 
 # Verification (Small Runs)

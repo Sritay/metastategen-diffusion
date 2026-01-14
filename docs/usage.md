@@ -18,10 +18,10 @@ math: mathjax
 Please select a topic from below or the sidebar:
 
 *   **[Installation](usage/installation.md)**: Setup instructions.
+*   **[Verification (Small Runs)](usage/verification.md)**: Quick-start commands to verify installation with minimal compute.
 *   **[Workflows](usage/workflows.md)**: How to run Training, AL, and Refinement loops.
 *   **[Analysis & Visualization](usage/analysis.md)**: Using the analysis scripts.
 *   **[Configuration](usage/configuration.md)**: Config file reference and CLI options.
-*   **[Verification (Small Runs)](usage/verification.md)**: Quick-start commands to verify installation with minimal compute.
 
 ---
 
