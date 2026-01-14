@@ -30,3 +30,22 @@ Key parameters in `configs/*.yaml`:
 | `--warmup-steps` | Steps with bond constraints enabled | 1000 |
 | `--step-size` | Langevin step size | 1e-5 |
 | `--keep-percent` | Fraction of lowest energy structures to keep | 1.0 (100%) |
+
+## Custom Data Layouts
+
+If your seed data or checkpoints are in non-standard locations, you can override them via CLI or Config:
+
+### Active Learning Overrides
+```bash
+msgen al --config configs/your_config.yaml \
+    "data.seed_path=/path/to/custom/seed.pt" \
+    "data.pool_path=/path/to/custom/pool.pt"
+```
+
+### Refinement Overrides
+Simply point the CLI arguments to your specific files:
+```bash
+msgen sample \
+    --diff-ckpt /path/to/my/model.pt \
+    --force-ckpt /path/to/my/force.pt ...
+```

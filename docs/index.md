@@ -7,7 +7,7 @@ has_children: false
 
 # MetaStateGen Diffusion
 
-[Next: Active Learning >](active_learning.md)
+
 
 ---
 
@@ -17,9 +17,10 @@ Welcome to the **MetaStateGen Diffusion** project documentation.
 > **Project Status**: This research software is currently under active development. Features, APIs, and documentation are undergoing frequent updates and are subject to change.
 
 ## Project Goal
-This project aims to generate physically valid, low-energy metastable states of peptides (focusing on Alanine Dipeptide) using a novel **Active Learning + Diffusion** approach.
+This project builds a Machine Learning model capable of predicting metastable states for molecular systems. 
+We currently focus on **Alanine Dipeptide** as a standard benchmark for evaluating generative models of metastable dynamics.
 
-We combine **Geometric Deep Learning (EGNN)** for capturing molecular symmetries with **Active Learning** to iteratively explore the conformational landscape.
+We combine **Geometric Deep Learning (EGNN)** for capturing molecular symmetries with **Active Learning** to iteratively explore and learn the conformational landscape efficiently.
 
 <div align="center">
   <img src="assets/movie.gif" alt="Generated Structures" width="60%">
@@ -46,7 +47,7 @@ We combine **Geometric Deep Learning (EGNN)** for capturing molecular symmetries
 *   **Datasets**: MDShare vs Timewarp.
 
 ### [4. Usage Guide](usage.md)
-### [4. Usage Guide](usage.md)
+
 *   **Installation**: Setup and Data Download.
 *   **Verification**: Fast sanity checks.
 *   **Workflows**: Training, Active Learning, and Refinement.
@@ -64,6 +65,10 @@ Molecular Dynamics (MD) is expensive. We want to generate diverse, low-energy mo
 1.  **Backbone Diffusion**: A diffusion model learns to generate the heavy-atom backbone roughly.
 2.  **Active Learning**: We don't just train once. We train, generate, find uncertainty, label it, and retrain. This pushes the model into new regions.
 3.  **Refinement**: We use a fast surrogate model (Pairwise Force Field) to relax the rough backbones into perfect physical structures.
+
+### Future Directions
+*   **Oracle Expansion**: Integration with AIMD/CP2K for ground truth energy evaluation on larger systems.
+*   **Generalization**: Extending the pipeline to multi-molecule systems and larger peptides.
 
 ---
 

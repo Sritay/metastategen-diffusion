@@ -9,8 +9,8 @@ nav_order: 2
 
 The primary way to interact with the project is via the `msgen` Command Line Interface (CLI).
 
-## 1. Active Learning Loop (Loop 24)
-To run the latest Active Learning iteration (Loop 24):
+## 1. Standard Active Learning Loop
+To run the latest Active Learning iteration:
 
 ### Via CLI (Local/Debug)
 ```bash
@@ -22,14 +22,14 @@ msgen al --config configs/ala2_al_24_hpc.yaml
 sbatch slurm/92_train_loop_24.sh
 ```
 
-## 2. Refinement Loop (Loop 23)
-To run the latest Refinement process (Loop 23 with fixed constraints):
+## 2. Standard Refinement Loop
+To run the latest Refinement process (with fixed constraints):
 
 ### Via CLI (Local/Debug)
 ```bash
 msgen sample \
-    --diff-ckpt models/pretrained/diffusion_model.pt \
-    --force-ckpt models/pretrained/force_field.pt \
+    --diff-ckpt pretrained_models/diffusion_model.pt \
+    --force-ckpt pretrained_models/force_field.pt \
     --out-dir runs/my_refinement_experiment \
     --n-samples 1000 \
     --batch-size 100 \
