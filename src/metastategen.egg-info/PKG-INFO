@@ -21,10 +21,22 @@ Requires-Dist: wandb
 # MetaStateGen-Diffusion
 
 Metastable state generation with equivariant diffusion for molecular dynamics.
+**[📘 Full Documentation Website](https://sritay.github.io/metastategen-diffusion/)**
+
+> [!IMPORTANT]
+> **Project Status**: This research software is currently under active development. Features, APIs, and documentation are undergoing frequent updates and are subject to change.
 
 ## Overview
 
-This project implements a "Physics-Compliant" diffusion model for generating metastable states of Alanine Dipeptide. It uses E(3)-equivariant networks and a two-stage active learning pipeline:
+This project aims to generate phsycially valid, low-energy metastable states of peptides (focusing on Alanine Dipeptide) using a novel **Active Learning + Diffusion** approach.
+
+<div align="center">
+  <img src="docs/assets/movie.gif" alt="Generated Structures" width="60%">
+  <br>
+  <em><strong>Figure 1: Generation in Action.</strong> The diffusion model generates diverse 10-atom backbones which are then reconstructed and refined into full all-atom structures.</em>
+</div>
+
+We combine **Geometric Deep Learning (EGNN)** for capturing molecular symmetries with **Active Learning** to iteratively explore the conformational landscape. It uses E(3)-equivariant networks and a two-stage active learning pipeline:
 
 1.  **Loop A (Active Learning):** Trains a committee of diffusion models on `mdshare` data to identify uncertainty and query an Oracle.
 2.  **Loop B (Refinement):** Uses a pairwise force surrogate (trained on TimeWarp data) to refine generated structures via Langevin dynamics, ensuring physical plausibility.
@@ -48,33 +60,7 @@ This project implements a "Physics-Compliant" diffusion model for generating met
 
 ## Usage
 
-### 1. Core Workflows (Scripts)
-The primary workflows are currently run via python scripts:
-
-**Training:**
-```bash
-python scripts/train_diffusion.py --config configs/ala2_default.yaml
-```
-
-**Active Learning Loop:**
-```bash
-python scripts/run_al_loop.py --config configs/ala2_al.yaml
-```
-
-**Sampling & Refinement:**
-```bash
-python scripts/sample_refined.py --diff-ckpt runs/best_model.pt --force-ckpt runs/energy_model.pt
-```
-
-### 2. CLI (Reporting)
-Installing the package (`pip install -e .`) provides the `msgen` command line tool. Currently, this is used for generating evaluation reports:
-
-```bash
-# Generate Reference Plots
-msgen report --dihedrals data/processed/ala2/dihedrals.npz --outdir reports/reference
-```
-
-*(Note: `train`, `sample`, and `al` subcommands are reserved for future CLI integration.)*
+Please refer to the **[Usage Guide](https://sritay.github.io/metastategen-diffusion/usage.html)** on our documentation website for detailed installation, training, and sampling instructions.
 
 ## Structure
 
