@@ -17,16 +17,20 @@ This guide details the internal function signatures, logic flows, and implementa
 graph TD
     A[main] --> B[run_active_learning]
     B --> C{Initialization}
-    C -->|Load| D[ALDataManager]
-    C -->|Build| E[Ensemble]
-    C -->|Load| F[DatasetOracle]
-    B --> G[Cold Start Training]
+    C --> D[Load Config & Data]
+    D --> E[Build Ensemble]
+    E --> F[Init Oracle]
+    
+    F --> G[Cold Start Training]
+    
     G --> H[AL Iteration Loop]
-    H --> I[Sample Candidates]
-    I --> J[Acquisition]
-    J --> K[Oracle Query]
-    K --> L[Retrain Ensemble]
-    L --> H
+    subgraph Loop [Iterative Loop]
+        H --> I[Sample Candidates]
+        I --> J[Acquisition]
+        J --> K[Oracle Query]
+        K --> L[Retrain Ensemble]
+        L --> H
+    end
 ```
 
 ---
