@@ -1,13 +1,13 @@
 ---
 layout: default
 title: "Developer: AL Loop"
-nav_order: 5
+nav_order: 6
 math: mathjax
 ---
 
 # Developer Guide: Active Learning Loop
 
-[< Back: Implementation](implementation.md)
+[< Back: Usage Guide](usage.md)
 
 This guide details the internal function signatures, logic flows, and implementation details of the Active Learning (AL) Loop found in `scripts/run_al_loop.py` and `src/metastategen/workflows/active_learning.py`.
 

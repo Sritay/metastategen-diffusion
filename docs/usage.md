@@ -7,7 +7,7 @@ math: mathjax
 
 # Usage Guide
 
-[< Back: Implementation](implementation.md) | [Back to Home >](index.md)
+[< Back: Implementation](implementation.md) | [Next: Developer Guide >](developers_al_loop.md)
 
 ---
 
@@ -31,4 +31,4 @@ Please select a topic from below or the sidebar:
 
 ---
 
-[< Back: Implementation](implementation.md) | [Back to Home >](index.md)
+[< Back: Implementation](implementation.md) | [Next: Developer Guide >](developers_al_loop.md)
