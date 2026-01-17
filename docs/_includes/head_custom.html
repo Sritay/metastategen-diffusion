@@ -28,14 +28,15 @@
   mermaid.initialize({ startOnLoad: false });
 
   document.addEventListener('DOMContentLoaded', function () {
-    const codeBlocks = document.querySelectorAll('pre.language-mermaid, .language-mermaid pre');
+    const codeBlocks = document.querySelectorAll('code.language-mermaid');
     codeBlocks.forEach(block => {
       const content = block.textContent;
       const newDiv = document.createElement('div');
       newDiv.className = 'mermaid';
       newDiv.textContent = content;
-      // The block is usually wrapped in a div.highlight or similar
-      const container = block.closest('div.highlighter-rouge') || block.parentNode;
+
+      const pre = block.parentNode;
+      const container = pre.closest('div.highlighter-rouge') || pre;
       container.replaceWith(newDiv);
     });
     mermaid.run();
