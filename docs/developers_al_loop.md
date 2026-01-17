@@ -7,7 +7,7 @@ math: mathjax
 
 # Developer Guide: Active Learning Loop
 
-[< Back: Usage Guide](usage.md)
+[< Back: Usage Guide](usage.md) | [Next: Refinement Loop >](developers_refinement.md)
 
 This guide details the internal function signatures, logic flows, and implementation details of the Active Learning (AL) Loop found in `scripts/run_al_loop.py` and `src/metastategen/workflows/active_learning.py`.
 
