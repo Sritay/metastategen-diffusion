@@ -17,17 +17,17 @@ This guide details the internal function signatures and logic of the Refinement 
 graph TD
     A[main] --> B[run_sampling]
     B --> C{Initialization}
-    C -->|Load| D[Diffusion Model (10-atom)]
-    C -->|Load| E[Pairwise Force Model (22-atom)]
-    C -->|Load| F[Template Structure (22-atom)]
+    C -->|Load| D["Diffusion Model (10-atom)"]
+    C -->|Load| E["Pairwise Force Model (22-atom)"]
+    C -->|Load| F["Template Structure (22-atom)"]
     
     B --> G[Batch Loop]
     subgraph Refinement Pipeline
-        G --> H[Sample Diffusion (10-atom)]
-        H --> I[Reconstruction (10 -> 22 atom)]
-        I --> J[Warmup Refinement (Gradient Descent)]
-        J --> K[Filtering (Keep Top 1% by Energy)]
-        K --> L[Main Refinement (Gradient Descent)]
+        G --> H["Sample Diffusion (10-atom)"]
+        H --> I["Reconstruction (10 -> 22 atom)"]
+        I --> J["Warmup Refinement (Gradient Descent)"]
+        J --> K["Filtering (Keep Top 1% by Energy)"]
+        K --> L["Main Refinement (Gradient Descent)"]
     end
     L --> M[Save Results]
 ```
