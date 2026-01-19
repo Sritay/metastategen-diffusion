@@ -11,6 +11,24 @@ nav_order: 4
 
 This section explains the post-processing scripts used to verify model quality.
 
+## 0. Ground Truth & Plotting Utilities (`regions.py`)
+
+**Location**: `scripts/analysis/regions.py`
+
+This helper script provides the **Ground Truth** Ramachandran landscape used as a background in all visualization plots.
+
+### Logic
+*   **Data Source**: It loads a large, pre-calculated validation set (typically Loop 5 or a dedicated reference set) containing $\sim 250,000$ frames of Alanine Dipeptide simulation.
+*   **Contour Plot**: It computes the 2D histogram of this reference data and applies Gaussian smoothing.
+*   **Overlay**: The function `plot_regions(ax)` draws filled contours (using `ax.contourf`) of this ground truth distribution onto any matplotlib axis passed to it.
+*   **Labels**: It explicitly labels known metastable basins:
+    *   **Alpha_R**: $(-70^\circ, -45^\circ)$
+    *   **Beta**: $(-140^\circ, 150^\circ)$
+    *   **C7eq**: $(-75^\circ, 70^\circ)$
+    *   **Alpha_L** & **C7ax**: Rare high-energy states.
+
+---
+
 ## 1. Density Evolution (`viz_density.py`)
 
 **Location**: `scripts/analysis/viz_density.py`
@@ -29,7 +47,7 @@ Visualizes how the model's learned distribution $P(x)$ changes over AL iteration
     *   Calculates $\phi, \psi$ torsion angles for all generated structures.
     *   Formula: Standard dihedral calculation using atoms `C-N-CA-C`.
 4.  **Binning**: Creates a 2D Hexbin histogram density plot.
-5.  **Overlay**: Plots generic "Ground Truth" regions (Alpha, Beta, C7eq) defined in `regions.py` as contour outlines.
+5.  **Overlay**: Calls `regions.plot_regions(ax)` to draw the background Ground Truth contours (see Section 0).
 
 ### Outputs
 *   **`evolution_density.png`**: Grid of Ramachandran plots (one per iteration).
@@ -80,4 +98,4 @@ Visualizes the "funneling" effect of the refinement loop.
     *   (Optional) Draws arrows connecting initial $\to$ final for select samples.
 
 ### Outputs
-*   **`funnel_plot.png`**: Overlay of Initial (Gray) vs Refined (Red) distributions on the Ramachandran plane.
+*   **`funnel_plot.png`**: Overlay of Initial (Gray) vs Refined (Red) distributions on the Ramachandran plane (with `regions.py` background).
