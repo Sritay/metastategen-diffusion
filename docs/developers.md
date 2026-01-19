@@ -16,6 +16,7 @@ Internal logic, function reference, and deep dives into the MetaStateGen archite
 
 ## Contents
 
+*   **[0. Architecture & Theory](developers/architecture.md)**: Deep dive into EGNNs, Pairwise Forces, and Datasets.
 *   **[1. Data Preprocessing](developers/data_preprocessing.md)**: How raw MD data is converted into training shards.
 *   **[2. Active Learning Loop](developers/al_loop.md)**: The "Loop A" logic (Ensembles, Oracle, Acquisition).
 *   **[3. Refinement Loop](developers/refinement.md)**: The "Loop B" logic (Reconstruction, Constraints, Force Field).

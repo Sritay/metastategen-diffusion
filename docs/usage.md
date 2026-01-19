@@ -7,7 +7,7 @@ math: mathjax
 
 # Usage Guide
 
-[< Back: Implementation](implementation.md) | [Next: Developer Guides >](developers.md)
+[< Back: Architecture](developers/architecture.md) | [Next: Developer Guides >](developers.md)
 
 ---
 
@@ -31,4 +31,4 @@ Please select a topic from below or the sidebar:
 
 ---
 
-[< Back: Implementation](implementation.md) | [Next: Developer Guides >](developers.md)
+[< Back: Architecture](developers/architecture.md) | [Next: Developer Guides >](developers.md)

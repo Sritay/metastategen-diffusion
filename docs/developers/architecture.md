@@ -1,13 +1,14 @@
 ---
 layout: default
-title: Implementation Details
-nav_order: 4
+title: Architecture & Theory
+parent: Developer Guides
+nav_order: 0
 math: mathjax
 ---
 
-# Implementation Details
+# Architecture & Theory
 
-[< Back: Refinement Loop](refinement.md) | [Next: Usage >](usage.md)
+[< Back: Developer Guides](../developers.md) | [Next: Usage Guide](../usage.md)
 
 ---
 
@@ -72,4 +73,4 @@ This model acts as a differentiable "calculator" that predicts Energy given posi
 
 ---
 
-[< Back: Refinement Loop](refinement.md) | [Next: Usage >](usage.md)
+[< Back: Refinement Loop](../refinement.md) | [Next: Usage >](../usage.md)

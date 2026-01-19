@@ -42,11 +42,9 @@ We combine **Geometric Deep Learning (EGNN)** for capturing molecular symmetries
 *   **Geometric Correction**: Using bond constraints and warm-up.
 *   **Energy Relaxation**: Using the Pairwise Force Field.
 
-### [3. Implementation Details](implementation.md)
-*   **Model Architecture**: EGNN configurations, Chirality, and Pairwise RBFs.
-*   **Datasets**: MDShare vs Timewarp.
 
-### [4. Usage Guide](usage.md)
+
+### [3. Usage Guide](usage.md)
 
 *   **Installation**: Setup and Data Download.
 *   **Verification**: Fast sanity checks.
@@ -54,8 +52,9 @@ We combine **Geometric Deep Learning (EGNN)** for capturing molecular symmetries
 *   **Analysis**: Visualization and metrics.
 *   **Configuration**: Full reference.
 
-### [5. Developer Guides](developers.md)
+### [4. Developer Guides](developers.md)
 
+*   **[Architecture & Theory](developers/architecture.md)**: Logic, Mathematical Foundations, and Dataset Specifications.
 *   **Data Preprocessing**: Script logic for `get_mdshare_data` and `setup_al_split`.
 *   **Active Learning Loop**: Deep dive into `run_active_learning` and ensemble training.
 *   **Refinement Loop**: Internals of `sample_refined` and reconstruction algorithms.
