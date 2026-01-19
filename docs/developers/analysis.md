@@ -17,37 +17,70 @@ This section explains the post-processing scripts used to verify model quality.
 
 Visualizes how the model's learned distribution $P(x)$ changes over AL iterations.
 
-**Logic**:
-*   **Input**: `runs/al_loop_...` directory.
-*   **Process**:
-    *   Iterates through each AL checkpoint.
-    *   Generates a batch of positions (Diffusion Sampling).
-    *   Calculates Phi/Psi backbone torsion angles.
-    *   Bins them into a 2D histogram (Ramachandran plot).
-*   **Metric**: Computes KL Divergence between the Generated Histogram and the Ground Truth (MD) Histogram.
-*   **Output**: `evolution_density.png` (Grid of plots).
+### Arguments
+*   `--run`: Path to AL output directory (e.g., `runs/day11...`).
+*   `--iters`: Comma-separated list of iterations to plot (e.g., "0,5,10,20").
+*   `--pdb`: Reference PDB for atom indices (default: `alanine-dipeptide-nowater.pdb`).
 
-## 2. Refinement Funnel (`viz_funnel.py`)
+### Logic
+1.  **Iterate**: Loops through requested `iter_XX` folders.
+2.  **Load**: Reads `eval_samples.pt` (generated at end of AL iteration).
+3.  **Compute Dihedrals**:
+    *   Calculates $\phi, \psi$ torsion angles for all generated structures.
+    *   Formula: Standard dihedral calculation using atoms `C-N-CA-C`.
+4.  **Binning**: Creates a 2D Hexbin histogram density plot.
+5.  **Overlay**: Plots generic "Ground Truth" regions (Alpha, Beta, C7eq) defined in `regions.py` as contour outlines.
+
+### Outputs
+*   **`evolution_density.png`**: Grid of Ramachandran plots (one per iteration).
+*   **`evolution_data.csv`**: Raw $\phi, \psi$ values for every sample at every iteration. Columns: `[Iter, Phi, Psi]`.
+
+---
+
+## 2. Cluster Analysis (`analyze_clusters.py`)
+
+**Location**: `scripts/analysis/analyze_clusters.py`
+
+Quantifies population ratios using circular clustering.
+
+### Arguments
+*   `--data`: Input CSV file (output from `viz_density.py`).
+
+### Logic (Circular DBSCAN)
+Since angles are periodic ($180^\circ \approx -180^\circ$), standard Euclidean distance is invalid.
+1.  **Embedding**: Maps points to the torus:
+    $$ X = [\cos\phi, \sin\phi, \cos\psi, \sin\psi] $$
+2.  **DBSCAN**: Clusters points in this 4D space (`eps=0.28`, `min_samples=15`).
+3.  **Classification**: Maps cluster centroids to basins:
+    *   **Alpha_R**: $\phi \in [-100, -40], \psi \in [-80, -10]$
+    *   **C7eq**: $\phi \in [-120, -40], \psi \in [0, 100]$
+    *   **Beta/C5**: Extended region $\phi \approx -180, \psi \approx 180$
+4.  **Counting**: Computes population percentage of each basin.
+
+### Outputs
+*   **`cluster_analysis.png`**: Scatter plot colored by identified cluster ID.
+*   **`cluster_analysis_summary.csv`**: Table of cluster counts and assignments.
+
+---
+
+## 3. Refinement Funnel (`viz_funnel.py`)
 
 **Location**: `scripts/analysis/viz_funnel.py`
 
 Visualizes the "funneling" effect of the refinement loop.
 
-**Logic**:
-*   **Input**: `runs/refinement_...` directory containing `initial_structures.pt` and `refined_structures.pt`.
-*   **Process**:
-    *   Compute Phi/Psi for `initial` (Diffusion output).
-    *   Compute Phi/Psi for `refined` (Force Field output).
-    *   Plot vectors/arrows connecting Initial -> Refined points on the Ramachandran plane.
-*   **Insight**: Shows if the force field correctly "snaps" rough guesses into the nearest physical basin (Alpha/Beta/C7eq).
+### Arguments
+*   `--run`: Path to refinement output directory.
 
-## 3. Cluster Analysis (`analyze_clusters.py`)
+### Logic
+1.  **Load**: Reads `refined_results.pt`.
+    *   Contains `initial_positions` (Diffusion outputs, 22-atom reconstructed).
+    *   Contains `refined_positions` (Force Field outputs, 22-atom relaxed).
+2.  **Compute Dihedrals**: Calculates $(\phi_{init}, \psi_{init})$ and $(\phi_{ref}, \psi_{ref})$.
+3.  **Plotting**:
+    *   **Gray Points**: Initial distribution (Scattered, often high energy).
+    *   **Red Points**: Final distribution (Tightly packed in basins).
+    *   (Optional) Draws arrows connecting initial $\to$ final for select samples.
 
-**Location**: `scripts/analysis/analyze_clusters.py`
-
-Quantifies population ratios.
-
-**Logic**:
-*   Definitions of basins (e.g., Alpha is $\phi \in [-100, -50], \psi \in [-60, -30]$).
-*   Counts percentage of samples falling into each defined region.
-*   Compares against Boltzmann weights from ground truth MD.
+### Outputs
+*   **`funnel_plot.png`**: Overlay of Initial (Gray) vs Refined (Red) distributions on the Ramachandran plane.
