@@ -56,8 +56,10 @@ We combine **Geometric Deep Learning (EGNN)** for capturing molecular symmetries
 
 ### [5. Developer Guides](developers.md)
 
-*   **[Preprocessing](developers/data_preprocessing.md)** & **[Analysis](developers/analysis.md)**
-*   **[AL Loop Internals](developers/al_loop.md)** & **[Refinement Internals](developers/refinement.md)**
+*   **Data Preprocessing**: Script logic for `get_mdshare_data` and `setup_al_split`.
+*   **Active Learning Loop**: Deep dive into `run_active_learning` and ensemble training.
+*   **Refinement Loop**: Internals of `sample_refined` and reconstruction algorithms.
+*   **Analysis Pipeline**: Implementation details for `viz_density`, `viz_funnel`, and cluster analysis.
 
 ---
 
