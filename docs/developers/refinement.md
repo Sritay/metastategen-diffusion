@@ -1,13 +1,14 @@
 ---
 layout: default
-title: "Developer: Refinement Loop"
-nav_order: 7
+title: "Refinement Loop"
+parent: Developer Guides
+nav_order: 3
 math: mathjax
 ---
 
 # Developer Guide: Refinement Loop
 
-[< Back: AL Loop](developers_al_loop.md)
+[< Back: Active Learning Loop](al_loop.md) | [Next: Analysis Pipeline >](analysis.md)
 
 This guide details the internal function signatures and logic of the Refinement Loop (Loop B), found in `scripts/sample_refined.py` and `src/metastategen/workflows/sampling.py`.
 
