@@ -61,15 +61,15 @@ We combine **Geometric Deep Learning (EGNN)** for capturing molecular symmetries
 
 ---
 
-## Quick Overview
+## Introduction
 
-### The Problem
-Molecular Dynamics (MD) is expensive. We want to generate diverse, low-energy molecular states without running simulation for weeks.
+### Motivation
+Molecular Dynamics (MD) simulations are computationally expensive, particularly for sampling rare events and metastable states. This project addresses the challenge of exploring diverse, low-energy conformational basins without the prohibitive cost of long-timescale simulations.
 
-### The Solution
-1.  **Backbone Diffusion**: A diffusion model learns to generate the heavy-atom backbone roughly.
-2.  **Active Learning**: We don't just train once. We train, generate, find uncertainty, label it, and retrain. This pushes the model into new regions.
-3.  **Refinement**: We use a fast surrogate model (Pairwise Force Field) to relax the rough backbones into perfect physical structures.
+### Methodology
+1.  **Generative Diffusion**: An E(3)-equivariant diffusion model approximates the Boltzmann distribution of the heavy-atom backbone, generating diverse candidate structures.
+2.  **Active Learning**: An iterative acquisition strategy uses ensemble uncertainty to guide the model towards unexplored regions of the energy landscape, efficiently effectively covering metastable basins.
+3.  **Refinement**: A physics-based surrogate model (Pairwise Force Field) relaxes the generated backbones via Langevin dynamics to specific local minima, ensuring physical validity and correct geometry.
 
 ### Future Directions
 *   **Oracle Expansion**: Integration with AIMD/CP2K for ground truth energy evaluation on larger systems.
