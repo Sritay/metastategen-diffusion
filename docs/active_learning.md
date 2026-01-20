@@ -6,7 +6,7 @@ nav_order: 2
 
 # Active Learning Loop (Backbone Generation)
 
-[< Back: Home](index.md) | [Next: Refinement >](refinement.md) | [Developer Guide >](developers/al_loop.md)
+[< Back: Home](index.md) | [Next: Refinement >](refinement.md)
 
 **Primary Script**: [`scripts/run_al_loop.py`](../scripts/run_al_loop.py)
 
@@ -52,4 +52,4 @@ Before the loop begins, we initialize an **Ensemble** of $M$ probabilistic model
 
 ---
 
-[< Back: Home](index.md) | [Next: Refinement >](refinement.md) | [Developer Guide >](developers/al_loop.md)
+[< Back: Home](index.md) | [Next: Refinement >](refinement.md)

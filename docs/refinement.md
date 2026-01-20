@@ -7,7 +7,7 @@ math: mathjax
 
 # Refinement Loop (All-Atom Reconstruction)
 
-[< Back: Active Learning](active_learning.md) | [Next: Usage Guide >](usage.md) | [Developer Guide >](developers/refinement.md)
+[< Back: Active Learning](active_learning.md) | [Next: Usage Guide >](usage.md)
 
 **Primary Script**: [`scripts/sample_refined.py`](../scripts/sample_refined.py)
 
@@ -45,4 +45,4 @@ The Refinement Loop converts the coarse, generated backbones into physically val
 
 ---
 
-[< Back: Active Learning](active_learning.md) | [Next: Usage Guide >](usage.md) | [Developer Guide >](developers/refinement.md)
+[< Back: Active Learning](active_learning.md) | [Next: Usage Guide >](usage.md)
