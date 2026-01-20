@@ -7,6 +7,10 @@ nav_order: 3
 
 # Training Workflows
 
+[< Back: Inference](inference.md) | [Next: Analysis >](analysis.md)
+
+---
+
 This section covers how to train the models from scratch, including the Active Learning loop. This is intended for developers or researchers reproducing the results.
 
 ## 1. Active Learning Loop
@@ -37,4 +41,8 @@ msgen train --config configs/ala2_default.yaml
 ```
 
 ### Force Field Surrogate
-(See `scripts/train_energy_force.py` - currently not exposed via `msgen` CLI but available in scripts).
+(See `scripts/train_pairwise.py` - currently not exposed via `msgen` CLI but available in scripts).
+
+---
+
+[< Back: Inference](inference.md) | [Next: Analysis >](analysis.md)
