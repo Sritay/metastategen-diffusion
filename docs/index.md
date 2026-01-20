@@ -48,7 +48,8 @@ We combine **Geometric Deep Learning (EGNN)** for capturing molecular symmetries
 
 *   **Installation**: Setup and Data Download.
 *   **Verification**: Fast sanity checks.
-*   **Workflows**: Training, Active Learning, and Refinement.
+*   **Inference**: Using pretrained models.
+*   **Training**: Active Learning and Dev workflows.
 *   **Analysis**: Visualization and metrics.
 *   **Configuration**: Full reference.
 

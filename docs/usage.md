@@ -19,7 +19,8 @@ Please select a topic from below or the sidebar:
 
 *   **[Installation](usage/installation.md)**: Setup instructions.
 *   **[Verification (Small Runs)](usage/verification.md)**: Quick-start commands to verify installation with minimal compute.
-*   **[Workflows](usage/workflows.md)**: How to run Training, AL, and Refinement loops.
+*   **[Inference (Sampling)](usage/inference.md)**: Using pretrained models to generate structures.
+*   **[Training (Dev)](usage/training.md)**: Training from scratch and Active Learning loops.
 *   **[Analysis & Visualization](usage/analysis.md)**: Using the analysis scripts.
 *   **[Configuration](usage/configuration.md)**: Config file reference and CLI options.
 
