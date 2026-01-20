@@ -7,7 +7,7 @@ nav_order: 4
 
 # Developer Guide: Analysis Pipeline
 
-[< Back: Refinement Loop](refinement.md)
+[< Back: Refinement Loop](refinement.md) | [Back to Index >](../developers.md)
 
 This section explains the post-processing scripts used to verify model quality.
 
@@ -98,4 +98,4 @@ Visualizes the "funneling" effect of the refinement loop.
     *   (Optional) Draws arrows connecting initial $\to$ final for select samples.
 
 ### Outputs
-*   **`funnel_plot.png`**: Overlay of Initial (Gray) vs Refined (Red) distributions on the Ramachandran plane (with `regions.py` background).
+[< Back: Refinement Loop](refinement.md) | [Back to Index >](../developers.md)

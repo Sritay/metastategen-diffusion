@@ -8,7 +8,7 @@ math: mathjax
 
 # Architecture & Theory
 
-[< Back: Developer Guides](../developers.md) | [Next: Usage Guide](../usage.md)
+[< Back: Developer Guides](../developers.md) | [Next: Data Preprocessing >](data_preprocessing.md)
 
 ---
 
@@ -116,4 +116,4 @@ $$ \vec{F}_i = - \nabla_{\vec{r}_i} E_{total}(\vec{r}) $$
 
 ---
 
-[< Back: Refinement Loop](../refinement.md) | [Next: Usage >](../usage.md)
+[< Back: Developer Guides](../developers.md) | [Next: Data Preprocessing >](data_preprocessing.md)

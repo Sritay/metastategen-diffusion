@@ -10,7 +10,7 @@ permalink: /developers.html
 
 Internal logic, function reference, and deep dives into the MetaStateGen architecture.
 
-[< Back: Usage Guide](usage.md) 
+[< Back: Usage Guide](usage.md) | [Next: Architecture >](developers/architecture.md) 
 
 ---
 
