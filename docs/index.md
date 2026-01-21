@@ -69,7 +69,7 @@ We combine **Geometric Deep Learning (EGNN)** for capturing molecular symmetries
 Molecular Dynamics (MD) simulations are computationally expensive, particularly for sampling rare events and metastable states. This project addresses the challenge of exploring diverse, low-energy conformational basins without the prohibitive cost of long-timescale simulations.
 
 ### Methodology
-1.  **EGNN-based Denoising Diffusion**: An E(3)-equivariant Graph Neural Network (EGNN) learns to reverse a diffusion process, approximating the Boltzmann distribution of the heavy-atom backbone.
+1.  **EGNN-based Denoising Diffusion**: An E(3)-equivariant Graph Neural Network (EGNN) learns to reverse a diffusion process, approximating the **underlying conformational distribution** of the heavy-atom backbone.
 2.  **Active Learning**: An iterative acquisition strategy uses ensemble uncertainty to guide the model towards unexplored regions of the energy landscape, efficiently effectively covering metastable basins.
 3.  **Refinement**: A physics-based **Pairwise Energy Surrogate** relaxes the generated backbones via Langevin dynamics to specific local minima, ensuring physical validity and correct geometry.
 
