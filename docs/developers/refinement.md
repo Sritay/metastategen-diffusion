@@ -48,7 +48,13 @@ Orchestrates the generation and physical refinement of molecular structures.
 *   `force_ckpt`: Path for the pairwise energy surrogate (Refiner).
 *   `n_samples`: Total number of desired samples.
 *   `refinement_steps`: Steps of gradient descent (e.g., 2000).
+*   `refinement_steps`: Steps of gradient descent (e.g., 2000).
 *   `keep_percent` (float): Fraction of samples to keep after warmup (e.g., 0.01 for top 1%).
+*   `output_formats` (list[str]): Formats to save (`pdb`, `gro`, `xyz`, `lammps_dump`, `lammps_data`).
+
+**Outputs**:
+*   Saves `refined_results.pt` (PyTorch dict with tensors).
+*   Saves additional files based on `output_formats` (e.g., `refined.pdb`, `refined.lammpstrj`).
 
 **Key Logic**:
 1.  **Model Loading**:

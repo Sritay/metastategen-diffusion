@@ -11,6 +11,7 @@ from metastategen.models.egnn import EGNN, EGNNConfig
 from metastategen.models.diffusion import GaussianDiffusion, DiffusionConfig
 from metastategen.models.pairwise import PairwiseEnergyModel
 from metastategen.reconstruct import align_and_reconstruct
+from metastategen.utils import io_formats
 
 log = get_logger("sample_refined")
 
@@ -113,7 +114,10 @@ def run_sampling(
     seed: int = 42,
     warmup_steps: int = 1000,
     keep_percent: float = 1.0,
+    output_formats: list[str] = None,
 ):
+    if output_formats is None:
+        output_formats = []
     set_deterministic(seed)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     log.info(f"Device: {device}")
@@ -260,4 +264,22 @@ def run_sampling(
     out_path.parent.mkdir(parents=True, exist_ok=True)
     torch.save(results, out_path)
     log.info(f"Saved refined results to {out_path}")
+    
+    # Save requested formats
+    if output_formats:
+        # Save refined
+        io_formats.save_outputs(
+             torch.cat(refined_samples, dim=0),
+             out_dir,
+             output_formats,
+             prefix="refined"
+        )
+        # Save initial
+        io_formats.save_outputs(
+             torch.cat(initial_samples, dim=0),
+             out_dir,
+             output_formats,
+             prefix="initial"
+        )
+
     return 0

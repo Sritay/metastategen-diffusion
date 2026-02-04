@@ -7,6 +7,10 @@ nav_order: 2
 
 # Inference Workflows
 
+[< Back: Verification](verification.md) | [Next: Training >](training.md)
+
+---
+
 This section covers how to use **Pretrained Models** to sample and refine molecular structures. This assumes you have downloaded the checkpoints to `pretrained_models/`.
 
 ## 1. Sampling & Refinement
@@ -37,9 +41,14 @@ msgen sample \
 | `--batch-size` | 100 | Batch size for inference (adjust based on GPU memory). |
 | `--refinement-steps` | 2000 | Number of gradient descent steps for energy minimization. Use `50000` for high-quality refinement. |
 | `--keep-percent` | 1.0 | Fraction of lowest-energy samples to keep (e.g., `0.01` keeps top 1%). |
+| `--output-formats` | `['pdb', 'lammps_data']` | List of formats to save: `pdb`, `gro`, `xyz`, `lammps_dump`, `lammps_data`. |
 
 ### Output
 
 The script creates a directory (e.g. `runs/test_sampling`) containing:
 *   `refined_results.pt`: A PyTorch file containing the final `refined_positions` (Batch, 22, 3) and `initial_positions`.
 *   `checkpoint_batch_*.pt`: Intermediate checkpoints.
+
+---
+
+[< Back: Verification](verification.md) | [Next: Training >](training.md)

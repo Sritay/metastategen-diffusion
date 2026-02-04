@@ -64,6 +64,7 @@ def _cmd_sample(args: argparse.Namespace) -> int:
         step_size=args.step_size,
         warmup_steps=args.warmup_steps,
         keep_percent=args.keep_percent,
+        output_formats=args.output_formats,
         seed=args.seed
     )
 
@@ -106,6 +107,8 @@ def build_parser() -> argparse.ArgumentParser:
     ps.add_argument("--warmup-steps", type=int, default=1000)
     ps.add_argument("--keep-percent", type=float, default=1.0)
     ps.add_argument("--seed", type=int, default=42)
+    ps.add_argument("--output-formats", nargs='+', default=['pdb', 'lammps_data'], 
+                    help="List of output formats: pdb, gro, xyz, lammps_dump, lammps_data")
     ps.set_defaults(func=_cmd_sample)
 
     # al
