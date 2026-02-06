@@ -12,54 +12,22 @@ from metastategen.utils import get_logger, set_deterministic
 
 log = get_logger("train_pairwise")
 
-# --- Dataset (Reused Logic) ---
+# --- Dataset ---
 class EnergyDataset(Dataset):
-    def __init__(self, shard_dir: str, forces_path: str, energies_path: str, trajs: list = None, subsample: int = 1):
+    def __init__(self, data_source: str, validation_split: float = 0.2):
         super().__init__()
-        # We only need forces/energies and POSITIONS (which must be 22-atom all-atom from TimeWarp?)
-        # WAIT: The "shards" in data/processed/ala2/shards are 10-atom.
-        # BUT train_energy.py was loading from there? No, train_energy.py was failing/confused.
-        # Actually: TimeWarp data IS the ground truth.
-        # We should load positions DIRECTLY from the TimeWarp arrays parallel to forces/energies?
-        # NO, forces/energies files are [N_total, ...].
-        # We need the POSITIONS that match them.
-        # Let's assume the user has 22-atom positions somewhere.
-        # Ah, 'alanine-dipeptide-3x250ns-heavy-atom-positions.npz' is 10-atom.
-        # TimeWarp dataset has 'test' and 'train' folders with full state.
         
-        # Data Loading Strategy:
-        # We expect the user to provide paths to forces and energies [.pt files].
-        # We infer the positions path. Positions should match the atom count of the system.
+        # Use generalized loader
+        from metastategen.data.manager import load_energy_data
+        data = load_energy_data(data_source)
         
-        self.shard_paths = sorted(glob.glob(f"{shard_dir}/*.pt"))
-        if not self.shard_paths:
-            # Fallback for when shard_dir is actually a direct file path or pattern
-            pass
-
-        # Loading massive arrays to memory directly (Fastest for < 2GB data)
-        log.info(f"Loading forces: {forces_path}")
-        self.forces = torch.load(forces_path) # [N, n_atoms, 3]
-        log.info(f"Loading energies: {energies_path}")
-        self.energies = torch.load(energies_path) # [N]
-        
-        # We need positions. Assuming they are saved next to forces?
-        # Let's try to infer positions path.
-        pos_path = forces_path.replace("forces", "positions")
-        if not Path(pos_path).exists():
-             # Try replacing "forces" with "coords" or look at config
-             raise FileNotFoundError(f"Cannot infer positions path from {forces_path}. Expected {pos_path}")
-        
-        log.info(f"Loading positions: {pos_path}")
-        self.positions = torch.load(pos_path) # [N, 22, 3]
+        self.positions = data['positions']
+        self.forces = data['forces']
+        self.energies = data['energies']
 
         # Basic validation
         assert self.positions.shape[0] == self.forces.shape[0]
         assert self.positions.shape[0] == self.energies.shape[0]
-        
-        # Splits
-        # Simple split: first 80% train, last 20% val (Time-based split)
-        # Or trajectory based.
-        # Let's accept indices argument.
         
     def __len__(self):
         return len(self.positions)
@@ -75,8 +43,8 @@ from metastategen.models.pairwise import PairwiseEnergyModel
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--forces", type=str, required=True, help="Path to .pt file with forces")
-    parser.add_argument("--energies", type=str, required=True, help="Path to .pt file with energies")
+    parser.add_argument("--data-source", type=str, required=True, 
+                        help="Path to data source (NPZ file, or directory with standard .pt files)")
     parser.add_argument("--epochs", type=int, default=100)
     parser.add_argument("--batch_size", type=int, default=256)
     parser.add_argument("--lr", type=float, default=1e-3)
@@ -87,9 +55,8 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     log.info(f"Target Device: {device}")
     
-    # Init Data (Load all)
-    # We create a simple ephemeral dataset since we don't have the config boilerplate
-    full_ds = EnergyDataset(None, args.forces, args.energies)
+    # Init Data
+    full_ds = EnergyDataset(args.data_source)
     
     # Infer n_atoms from dataset
     # Position shape is [N, n_atoms, 3]

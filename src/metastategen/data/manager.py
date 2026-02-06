@@ -170,3 +170,94 @@ class ALDataManager:
 
     def size(self) -> int:
         return int(sum(d["positions"].shape[0] for d in self._datasets))
+
+
+def load_energy_data(source: Union[str, Path], recursive_coords: bool = False) -> dict[str, torch.Tensor]:
+    """
+    Generalized loader for energy/force datasets.
+    Supported sources:
+    - .npz file: Must contain 'positions'/'coords', 'forces', 'energies'.
+    - Directory: Assumed to contain .pt shards (forces.pt, energies.pt, positions.pt).
+    
+    Args:
+        source: Path to file or directory.
+        recursive_coords: If True, tries to find positions.pt if not explicitly in source list (for legacy shards).
+
+    Returns:
+        Dict with keys: 'positions', 'forces', 'energies'.
+    """
+    source = Path(source)
+    if not source.exists():
+        raise FileNotFoundError(f"Data source not found: {source}")
+
+    if source.is_file():
+        if source.suffix == ".npz":
+            return _load_npz_energy_data(source)
+        else:
+            raise ValueError(f"Unsupported file format for energy data: {source.suffix}")
+    
+    elif source.is_dir():
+        # Assume legacy PT shards style, or a directory of NPZs (not implemented yet)
+        # For now, replicate the logic from train_pairwise for .pt files
+        # Expect forces.pt and energies.pt and positions.pt
+        return _load_pt_directory(source)
+    
+    else:
+         raise ValueError(f"Invalid data source type: {source}")
+
+def _load_npz_energy_data(path: Path) -> dict[str, torch.Tensor]:
+    log.info(f"Loading energy data from NPZ: {path}")
+    data = np.load(path)
+    
+    # Positions
+    if "positions" in data:
+        pos = data["positions"]
+    elif "coords" in data:
+        pos = data["coords"]
+    else:
+        raise KeyError(f"NPZ {path} missing 'positions' or 'coords'")
+    
+    # Forces
+    if "forces" not in data:
+         raise KeyError(f"NPZ {path} missing 'forces'")
+    forces = data["forces"]
+    
+    # Energies
+    if "energies" not in data:
+         raise KeyError(f"NPZ {path} missing 'energies'")
+    energies = data["energies"]
+    if energies.ndim > 1:
+        energies = energies[:, 0] # Assume col 0 is PE
+        
+    return {
+        "positions": torch.from_numpy(pos).float(),
+        "forces": torch.from_numpy(forces).float(),
+        "energies": torch.from_numpy(energies).float()
+    }
+
+def _load_pt_directory(path: Path) -> dict[str, torch.Tensor]:
+    # Try to find specific filenames
+    # Common convention from this project: forces.pt, energies.pt, positions.pt
+    # Or shards like shard_*.pt containing dicts? 
+    # train_pairwise previously assumed separate giant .pt files for forces/energies
+    
+    forces_path = path / "forces.pt"
+    energies_path = path / "energies.pt"
+    positions_path = path / "positions.pt"
+    
+    if not forces_path.exists() or not energies_path.exists():
+        # Check for shards (e.g. data/processed/ala2/shards/*.pt)
+        # Shards usually contain {'positions', 'atom_types', ...} but maybe not forces/energies?
+        # The 'train_pairwise.py' original code took EXPLICIT paths for forces and energies.
+        # So passing a directory implies standard filenames.
+        # If files are named differently, user must point to file directly (which load_energy_data doesn't support for .pt yet? 
+        # Actually simplest is to support explicit kwargs in loading if needed, or just standard names.
+        raise FileNotFoundError(f"Directory {path} must contain forces.pt and energies.pt (and positions.pt)")
+
+    log.info(f"Loading directory: {path}")
+    return {
+        "positions": torch.load(positions_path),
+        "forces": torch.load(forces_path),
+        "energies": torch.load(energies_path)
+    }
+
