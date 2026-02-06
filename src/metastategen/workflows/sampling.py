@@ -28,9 +28,25 @@ def load_diffusion_model(config_path, ckpt_path, device):
         rbf_dim=cfg['model'].get('rbf_dim', 64),
         rbf_cutoff=cfg['model'].get('rbf_cutoff', 1.0)
     )
-    # Read n_atom_types from config, default to 3 (C, O, N)
-    n_atom_types = cfg.get('model', {}).get('n_atom_types', 3) 
     
+    if ckpt_path.exists():
+        log.info(f"Loading diffusion checkpoint from {ckpt_path}")
+        d = torch.load(ckpt_path, map_location=device)
+        state_dict = d['model'] if 'model' in d else d
+    else:
+        raise FileNotFoundError(f"Diffusion checkpoint not found at {ckpt_path}!")
+
+    # Infer n_atom_types from checkpoint if possible
+    # EGNN embedding weight: atom_emb.weight [n_types, hidden_dim]
+    if 'atom_emb.weight' in state_dict:
+        n_ckpt_types = state_dict['atom_emb.weight'].shape[0]
+        log.info(f"Inferred {n_ckpt_types} atom types from checkpoint.")
+        n_atom_types = n_ckpt_types
+    else:
+        # Fallback to config or default
+        n_atom_types = cfg.get('model', {}).get('n_atom_types', 3)
+        log.warning(f"Could not infer atom types from checkpoint. Using config/default: {n_atom_types}")
+
     model = EGNN(
         n_atom_types=n_atom_types,
         hidden_dim=cfg['model']['hidden_dim'],
@@ -51,12 +67,7 @@ def load_diffusion_model(config_path, ckpt_path, device):
     )
     diffusion = GaussianDiffusion(diff_cfg).to(device)
     
-    if ckpt_path.exists():
-        log.info(f"Loading diffusion checkpoint from {ckpt_path}")
-        d = torch.load(ckpt_path, map_location=device)
-        model.load_state_dict(d['model'] if 'model' in d else d)
-    else:
-        log.warning(f"Diffusion checkpoint not found at {ckpt_path}!")
+    model.load_state_dict(state_dict)
         
     return model, diffusion, cfg
 
