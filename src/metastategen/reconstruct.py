@@ -7,15 +7,15 @@ def align_and_reconstruct(
     heavy_indices: List[int]
 ) -> torch.Tensor:
     """
-    Aligns a 22-atom template to a 10-atom generated backbone and returns the reconstructed 22-atom structure.
+    Aligns a template (full generic structure) to a generated backbone and returns the reconstructed all-atom structure.
     
     Args:
-        x_gen: [B, 10, 3] Generated heavy atoms
-        x_template: [22, 3] Reference structure (All atoms)
-        heavy_indices: List of indices in template corresponding to heavy atoms (0..21)
+        x_gen: [B, N_heavy, 3] Generated heavy atoms
+        x_template: [N_total, 3] Reference structure (All atoms)
+        heavy_indices: List of indices in template corresponding to heavy atoms (0..N_total-1)
         
     Returns:
-        x_recon: [B, 22, 3] Reconstructed all-atom structures
+        x_recon: [B, N_total, 3] Reconstructed all-atom structures
     """
     B = x_gen.shape[0]
     device = x_gen.device

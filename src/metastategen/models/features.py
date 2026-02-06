@@ -1,5 +1,5 @@
-
 import torch
+from typing import Optional, List, Dict
 
 def compute_active_chiral_features(x: torch.Tensor, scale_factor: float = 1.0) -> torch.Tensor:
     """
@@ -67,72 +67,80 @@ def compute_active_chiral_features(x: torch.Tensor, scale_factor: float = 1.0) -
     return V
 
 
-def compute_chiral_volume_signal(x: torch.Tensor, scale_factor: float = 1.0) -> torch.Tensor:
+def compute_chiral_volume_signal(x: torch.Tensor, scale_factor: float = 1.0, chirality_config: Optional[List[Dict]] = None) -> torch.Tensor:
     """
-    Computes the EXPLICIT Scalar Triple Product (Signed Volume) for the Chiral Center.
+    Computes the EXPLICIT Scalar Triple Product (Signed Volume) for Chiral Centers.
     
-    Definition:
-        Center: CA (Idx 4)
-        Neighbors: N (3), CB (5), C (6)
-        
-        V = (r_N - r_CA) . [ (r_CB - r_CA) x (r_C - r_CA) ]
-        
-    This geometric invariant strictly flips sign under mirror reflection (Enantiomers),
-    robustly distinguishing L-Ala (Phi < 0) from D-Ala (Phi > 0).
+    If chirality_config is provided, computes volume for each specified center.
+    If NOT provided, attempts to fallback to Alanine Dipeptide hardcoded logic (idx 4,3,5,6).
     
     Args:
         x: [B, N_atoms, 3]
         scale_factor: Data scale factor for un-scaling.
+        chirality_config: List of dicts, each with keys:
+                          "center_idx": int
+                          "neighbors": List[int] [nA, nB, nC]
         
     Returns:
         signal: [B, N_atoms, 1] 
-                (Note: We return per-node shape for compatibility, but the signal is 
-                 identical for all nodes in the molecule or localized to CA).
+                Populates the volume at the 'center_idx' node.
+                Other nodes may be zero or receive a broadcasted value depending on strategy.
     """
     B, N, _ = x.shape
+    device = x.device
     
-    # Indices for Alanine Dipeptide
-    # N: 3, CA: 4, CB: 5, C: 6
-    idx_CA = 4
-    idx_N = 3
-    idx_CB = 5
-    idx_C = 6
-    
-    if N <= 6:
-        # Fallback for subsets or debugging
-        return torch.zeros(B, N, 1, device=x.device)
-
     # Operations on unscaled data for physical consistency
     if scale_factor != 1.0:
         x_in = x / scale_factor
     else:
         x_in = x
         
-    r_CA = x_in[:, idx_CA] # [B, 3]
-    r_N = x_in[:, idx_N]
-    r_CB = x_in[:, idx_CB]
-    r_C = x_in[:, idx_C]
+    signal = torch.zeros(B, N, 1, device=device)
     
-    # Vectors from CA
-    v1 = r_N - r_CA
-    v2 = r_CB - r_CA
-    v3 = r_C - r_CA
-    
-    # Scalar Triple Product
-    # V = v1 . (v2 x v3)
-    cross_product = torch.cross(v2, v3, dim=-1) # [B, 3]
-    volume = torch.sum(v1 * cross_product, dim=-1, keepdim=True) # [B, 1]
-    
-    # Normalize magnitude to be ~O(1) for the diffusion model conditioning.
-    # Typical volume ~ 0.003 (nm^3).
-    # We multiply by 1000 to bring it to ~3.0, which is a good range for NN inputs.
-    
-    signal = volume * 1000.0 # [B, 1]
-    
-    # Broadcast to all nodes [B, N, 1]
-    # Ideally simpler models might only need it on CA, 
-    # but the architecture expects per-node features.
-    signal = signal.unsqueeze(1).expand(-1, N, -1)
-    
+    if chirality_config is None:
+        # Backward compatibility / Fallback for Ala2
+        # N(3), CA(4), CB(5), C(6)
+        if N > 6:
+            chirality_config = [{
+                "center_idx": 4,
+                "neighbors": [3, 5, 6]
+            }]
+        else:
+            return signal
+
+    for cfg in chirality_config:
+        c_idx = cfg["center_idx"]
+        n_idxs = cfg["neighbors"] # [n1, n2, n3]
+        
+        if c_idx >= N or any(ni >= N for ni in n_idxs):
+            continue
+
+        r_CA = x_in[:, c_idx]    # [B, 3]
+        r_n1 = x_in[:, n_idxs[0]]
+        r_n2 = x_in[:, n_idxs[1]]
+        r_n3 = x_in[:, n_idxs[2]]
+        
+        # Vectors from CA
+        v1 = r_n1 - r_CA
+        v2 = r_n2 - r_CA
+        v3 = r_n3 - r_CA
+        
+        # Scalar Triple Product: V = v1 . (v2 x v3)
+        cross_product = torch.cross(v2, v3, dim=-1) # [B, 3]
+        volume = torch.sum(v1 * cross_product, dim=-1, keepdim=True) # [B, 1]
+        
+        # Normalize: * 1000.0 (roughly nm^3 -> unit range)
+        val = volume * 1000.0
+        
+        # Assign to the Center Node
+        signal[:, c_idx, :] = val
+        
+        # Optional: diffuse/broadcast to neighbors? 
+        # For simple AL logic, we often just want a global "chiral state" indicator.
+        # If we have multiple centers, local assignment is better.
+        # If we have only one (Ala2), previous logic broadcasted to ALL.
+        if len(chirality_config) == 1:
+             signal = val.unsqueeze(1).expand(-1, N, -1)
+
     return signal
 

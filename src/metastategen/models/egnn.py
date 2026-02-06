@@ -249,10 +249,11 @@ class EGNN(nn.Module):
         
         for layer in self.layers:
             chiral_feats = None
-            if condition is not None:
-                chiral_feats = condition
-            elif self.cfg.use_chiral_features:
-                chiral_feats = compute_active_chiral_features(x, scale_factor=self.cfg.data_scale) # [B, N, 1]
+            if self.cfg.use_chiral_features:
+                if condition is not None:
+                    chiral_feats = condition
+                else:
+                    chiral_feats = compute_active_chiral_features(x, scale_factor=self.cfg.data_scale) # [B, N, 1]
             
             h_emb, x = layer(h_emb, x, edge_attr, chiral_features=chiral_feats)
             

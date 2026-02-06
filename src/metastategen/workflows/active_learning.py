@@ -11,9 +11,9 @@ from typing import Union, Optional
 
 from metastategen.active_learning import select_acquisition
 try:
-    from metastategen.data import ALDataManager, load_al_data
+    from metastategen.data import ALDataManager, load_al_data, load_npz_as_al_data
 except ImportError:  # Fallback
-    from metastategen.data.manager import ALDataManager, load_al_data
+    from metastategen.data.manager import ALDataManager, load_al_data, load_npz_as_al_data
 from metastategen.eval.coverage import kl_from_phi_psi
 from metastategen.eval.rmsd import greedy_cluster, rmsd_kabsch
 from metastategen.models.diffusion import center, constrain_bonds, constrain_chirality
@@ -28,7 +28,11 @@ from metastategen.oracles import DatasetOracle
 from metastategen.utils import get_logger, set_deterministic
 from metastategen.models.features import compute_chiral_volume_signal
 from metastategen.utils.geometry import compute_dihedrals, rad2deg
-from metastategen.utils.pdb import get_ala2_heavy_atom_indices
+try:
+    from metastategen.utils.pdb import get_ala2_heavy_atom_indices
+except ImportError:
+    get_ala2_heavy_atom_indices = None
+from metastategen.data.topology import MoleculeTopology
 
 log = get_logger("run_al_loop")
 
@@ -94,10 +98,12 @@ def _train_member(
     grad_clip: float,
     rot_aug: bool,
     iter_idx: int,
+    chirality_config: list = None,
 ) -> None:
     model = state["model"]
     opt = state["opt"]
     device = state["device"]
+    chirality_config = state.get("chirality_config", None) # Retrieve from state if needed, or pass explicitly
 
     start = time.time()
     for _ in range(epochs):
@@ -114,7 +120,7 @@ def _train_member(
             scale_factor = diffusion.cfg.scale_factor
             condition = None
             if hasattr(model, "cfg") and getattr(model.cfg, "use_chiral_features", False):
-                 condition = compute_chiral_volume_signal(x, scale_factor=scale_factor)
+                 condition = compute_chiral_volume_signal(x, scale_factor=scale_factor, chirality_config=chirality_config)
             
             t = torch.randint(1, diffusion.cfg.T + 1, (bsz,), device=device)
             loss, _ = diffusion.training_loss(model, x, a, t, rot_aug=rot_aug, condition=condition)
@@ -136,7 +142,7 @@ def _train_member(
 
 
 @torch.no_grad()
-def _consensus_ddpm(ensemble: Ensemble, diffusion, shape: tuple[int, ...], h: torch.Tensor, model_kwargs: dict = None):
+def _consensus_ddpm(ensemble: Ensemble, diffusion, shape: tuple[int, ...], h: torch.Tensor, model_kwargs: dict = None, constraints: torch.Tensor = None, chirality_config: list = None):
     device = diffusion.betas.device
     bsz = shape[0]
     xt = torch.randn(shape, device=device)
@@ -183,8 +189,9 @@ def _consensus_ddpm(ensemble: Ensemble, diffusion, shape: tuple[int, ...], h: to
         else:
             xt = mean
             
-        xt = constrain_chirality(xt, scale_factor=diffusion.cfg.scale_factor)
-        xt = constrain_bonds(xt, scale_factor=diffusion.cfg.scale_factor)
+        # Generalized Constraints
+        xt = constrain_chirality(xt, chirality_config=chirality_config)
+        xt = constrain_bonds(xt, constraints=constraints, scale_factor=diffusion.cfg.scale_factor)
         
         if diffusion.cfg.recenter_every_step:
             xt = center(xt)
@@ -201,6 +208,8 @@ def _consensus_ddim(
     steps: int,
     eta: float,
     model_kwargs: dict = None,
+    constraints: torch.Tensor = None,
+    chirality_config: list = None,
 ):
     device = diffusion.betas.device
     bsz = shape[0]
@@ -241,14 +250,18 @@ def _consensus_ddim(
         noise = torch.randn_like(xt) if eta > 0 else 0.0
 
         xt = torch.sqrt(alpha_bar_prev) * pred_x0 + dir_xt + sigma * noise
-        xt = constrain_chirality(xt, scale_factor=diffusion.cfg.scale_factor)
-        xt = constrain_bonds(xt, scale_factor=diffusion.cfg.scale_factor)
+        
+        # Generalized Constraints
+        xt = constrain_chirality(xt, chirality_config=chirality_config)
+        xt = constrain_bonds(xt, constraints=constraints, scale_factor=diffusion.cfg.scale_factor)
+        
         if diffusion.cfg.recenter_every_step:
             xt = center(xt)
 
     return xt, unc_accum / max(1, n_steps)
 
 
+@torch.no_grad()
 @torch.no_grad()
 def _sample_candidates(
     ensemble: Ensemble,
@@ -259,6 +272,8 @@ def _sample_candidates(
     steps: int,
     eta: float,
     condition: Union[torch.Tensor, dict] = None,
+    constraints: torch.Tensor = None,
+    chirality_config: list = None,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     ensemble.eval()
     device = diffusion.betas.device
@@ -299,20 +314,54 @@ def _sample_candidates(
             model_kwargs["condition"] = c_batch
 
         if eta == 0.0 and steps < diffusion.cfg.T:
-            x0, unc = _consensus_ddim(ensemble, diffusion, shape, h, steps=steps, eta=eta, model_kwargs=model_kwargs)
+            x0, unc = _consensus_ddim(ensemble, diffusion, shape, h, steps=steps, eta=eta, model_kwargs=model_kwargs, constraints=constraints, chirality_config=chirality_config)
         else:
             if eta != 0.0 and steps < diffusion.cfg.T:
                 log.warning("DDIM steps < T with eta>0 is not supported; using full DDPM steps.")
-            x0, unc = _consensus_ddpm(ensemble, diffusion, shape, h, model_kwargs=model_kwargs)
+            x0, unc = _consensus_ddpm(ensemble, diffusion, shape, h, model_kwargs=model_kwargs, constraints=constraints, chirality_config=chirality_config)
         samples.append(x0.cpu())
         uncertainty.append(unc.cpu())
         log.info("Sample batch %d/%d done.", i + 1, n_batches)
     return torch.cat(samples, dim=0), torch.cat(uncertainty, dim=0)
 
 
-def _compute_phi_psi(samples: torch.Tensor, pdb_path: Path) -> np.ndarray:
-    phi_idx, psi_idx = get_ala2_heavy_atom_indices(pdb_path)
-    indices = torch.tensor([phi_idx, psi_idx], dtype=torch.long, device=samples.device)
+def _compute_phi_psi(samples: torch.Tensor, pdb_path: str = None, torsion_indices: Tuple[List[List[int]], List[List[int]]] = None) -> np.ndarray:
+    """
+    Computes Phi/Psi angles (degrees) for generated samples.
+    Args:
+        samples: [B, N, 3]
+        pdb_path: Ignored if torsion_indices is provided. Backward compat.
+        torsion_indices: (phi_indices, psi_indices) from MoleculeTopology.
+    """
+    device = samples.device
+    
+    if torsion_indices is not None:
+        phi_idx, psi_idx = torsion_indices
+    else:
+        # Fallback to old behavior (Ala2 specific)
+        if pdb_path is None: 
+            return None
+        # We need to import locally to avoid circular deps if needed or just use the old import
+        from metastategen.utils.pdb import get_ala2_heavy_atom_indices
+        phi_atoms, psi_atoms = get_ala2_heavy_atom_indices(Path(pdb_path))
+        # Convert atom list to flat indices? get_ala2... returns ([i1, i2, i3, i4], [i1...])
+        # Actually it returns lists of indices for ONE phi/psi pair.
+        # We wrap in list to match structure of Generalized lists
+        phi_idx = [phi_atoms]
+        psi_idx = [psi_atoms]
+
+    # Flatten logic: We only compute the FIRST pair for now for metric compatibility with Ala2 plots
+    # If generalized, we might return ALL phis/psis? 
+    # For now, let's just grab the first valid set found to keep return shape [B, 2] consistent with evaluation plots.
+    
+    if not phi_idx or not psi_idx:
+        return None
+
+    # Use first found torsion pair
+    first_phi = phi_idx[0]
+    first_psi = psi_idx[0]
+    
+    indices = torch.tensor([first_phi, first_psi], dtype=torch.long, device=device)
     rads = compute_dihedrals(samples, indices)
     degs = rad2deg(rads)
     degs = (degs + 180.0) % 360.0 - 180.0
@@ -343,6 +392,9 @@ def _evaluate(
     iter_dir: Path,
     seed: int,
     condition: Union[torch.Tensor, dict] = None,
+    constraints: torch.Tensor = None,
+    chirality_config: list = None,
+    torsion_indices: tuple = None,
 ) -> dict:
     al_cfg = cfg.get("active_learning", {})
     n_eval = int(al_cfg.get("eval_samples", 1000))
@@ -352,7 +404,7 @@ def _evaluate(
     rmsd_thresh = float(al_cfg.get("rmsd_thresh", 0.75))
 
     set_deterministic(seed)
-    samples, _ = _sample_candidates(ensemble, diffusion, atom_types, n_eval, batch_size, steps, eta, condition=condition)
+    samples, _ = _sample_candidates(ensemble, diffusion, atom_types, n_eval, batch_size, steps, eta, condition=condition, constraints=constraints, chirality_config=chirality_config)
     
     # Scale correction
     scale_factor = float(cfg.get("data", {}).get("scale_factor", 1.0))
@@ -364,11 +416,14 @@ def _evaluate(
     meta = torch.load(meta_path)
     pdb_path = Path(meta.get("pdb_path", "data/raw/alanine-dipeptide-nowater.pdb"))
 
-    if pdb_path.exists():
-        gen_phi_psi = _compute_phi_psi(samples.to(diffusion.betas.device), pdb_path)
-        kl = kl_from_phi_psi(gen_phi_psi, val_phi_psi, bins=int(al_cfg.get("phi_psi_bins", 180)))
+    if pdb_path.exists() or torsion_indices is not None:
+        gen_phi_psi = _compute_phi_psi(samples.to(diffusion.betas.device), pdb_path=pdb_path if pdb_path.exists() else None, torsion_indices=torsion_indices)
+        if val_phi_psi is not None and gen_phi_psi is not None:
+            kl = kl_from_phi_psi(gen_phi_psi, val_phi_psi, bins=int(al_cfg.get("phi_psi_bins", 180)))
+        else:
+            kl = -1.0
     else:
-        log.warning("PDB not found at %s. Skipping Phi/Psi KL divergence.", pdb_path)
+        log.warning("PDB not found and no torsion indices. Skipping Phi/Psi KL divergence.")
         kl = -1.0
 
     basin_count = _basin_coverage(samples, val_medoids, rmsd_thresh=rmsd_thresh)
@@ -395,15 +450,63 @@ def run_active_learning(config_path: str) -> int:
     with (run_root / "config.yaml").open("w") as f:
         yaml.safe_dump(cfg, f, sort_keys=False)
 
-    seed_path = data_cfg.get("seed_path")
-    pool_path = data_cfg.get("pool_path")
-    val_path = data_cfg.get("val_path")
-    if not seed_path or not pool_path or not val_path:
-        raise ValueError("data.seed_path, data.pool_path, and data.val_path must be set")
-
-    for p in (seed_path, pool_path, val_path):
-        if not Path(p).exists():
-            raise FileNotFoundError(f"Missing AL split file: {p}")
+    seed_path = Path(data_cfg.get("seed_path", "data/processed/default/seed.pt"))
+    pool_path = Path(data_cfg.get("pool_path", "data/processed/default/pool.pt"))
+    val_path = Path(data_cfg.get("val_path", "data/processed/default/val.pt"))
+    
+    # Check if splits exist; if not, try to create them from raw NPZ + PDB
+    if not (seed_path.exists() and pool_path.exists() and val_path.exists()):
+        log.info("AL split files not found. Checking for raw inputs to auto-generate splits...")
+        
+        npz_source = data_cfg.get("npz_path")
+        pdb_source = data_cfg.get("pdb_path") # Used for topology
+        
+        if npz_source and pdb_source and Path(npz_source).exists() and Path(pdb_source).exists():
+            log.info(f"Ingesting raw data from {npz_source} and {pdb_source}")
+            
+            # Load full dataset
+            full_data = load_npz_as_al_data(Path(npz_source), Path(pdb_source))
+            n_total = full_data["positions"].shape[0]
+            log.info(f"Loaded {n_total} frames. Splitting...")
+            
+            # Splitting Logic
+            n_seed = int(al_cfg.get("initial_seed_size", 100))
+            n_val = int(al_cfg.get("val_size", 2000))
+            n_pool = n_total - n_seed - n_val
+            
+            if n_pool < 0:
+                raise ValueError(f"Dataset size {n_total} too small for requested seed={n_seed}, val={n_val}")
+                
+            # Sequential split for simplicity and trajectory coherence (Head=Seed, Tail=Val, Mid=Pool)
+            # This mimics 'past' data (Seed) vs 'future' data (Val)
+            positions = full_data["positions"]
+            atom_types = full_data["atom_types"]
+            
+            # Use .clone() to decouple storage, ensuring saved files are small
+            seed_data = {
+                "positions": positions[:n_seed].clone(),
+                "atom_types": atom_types.clone()
+            }
+            
+            pool_data = {
+                "positions": positions[n_seed:-n_val].clone(),
+                "atom_types": atom_types.clone()
+            }
+            
+            val_data = {
+                "positions": positions[-n_val:].clone(),
+                "atom_types": atom_types.clone()
+            }
+            
+            # Save splits
+            seed_path.parent.mkdir(parents=True, exist_ok=True)
+            torch.save(seed_data, seed_path)
+            torch.save(pool_data, pool_path)
+            torch.save(val_data, val_path)
+            log.info(f"Auto-generated splits saved to {seed_path.parent}")
+            
+        else:
+             raise FileNotFoundError(f"Missing AL splits AND missing valid raw inputs (npz_path, pdb_path).")
 
     seed_data = load_al_data(seed_path)
     val_data = load_al_data(val_path)
@@ -416,6 +519,22 @@ def run_active_learning(config_path: str) -> int:
 
     atom_types = seed_data["atom_types"]
     n_atom_types = int(atom_types.max().item()) + 1
+    
+    # 4. Topology Inference
+    topo_path = data_cfg.get("topo_path", data_cfg.get("pdb_path")) # Prefer topo_path, fallback to pdb
+    constraints = None
+    chirality_config = None
+    torsion_indices = None # (phi_list, psi_list)
+
+    if topo_path and Path(topo_path).exists():
+        topology = MoleculeTopology(topo_path)
+        log.info(f"Loaded topology from {topo_path}")
+        constraints = topology.infer_constraints().to(torch.device("cuda" if torch.cuda.is_available() else "cpu"))
+        chirality_config = topology.infer_chirality_config()
+        torsion_indices = topology.infer_torsions() # ([phi_ids...], [psi_ids...])
+        log.info(f"Inferred {len(chirality_config)} chiral centers and {len(torsion_indices[0])} phi torsions.")
+    else:
+        log.warning("No topology file found. Using NO constraints/torsions.")
     
     # Compute Target Chiral Condition
     condition_strategy = al_cfg.get("condition_strategy", "fixed")
@@ -431,11 +550,11 @@ def run_active_learning(config_path: str) -> int:
         }
     else:
         # Fixed strategy (Default)
-        # Compute from Seed Data (Assumed L-Alanine)
+        # Compute from Seed Data using inferred Chirality Config
         with torch.no_grad():
             # Seed data loaded from .pt is typically raw (nm).
             pos_subset = seed_data["positions"][:100]
-            computed = compute_chiral_volume_signal(pos_subset, scale_factor=1.0).mean(dim=0)
+            computed = compute_chiral_volume_signal(pos_subset, scale_factor=1.0, chirality_config=chirality_config).mean(dim=0)
             target_condition = computed.to(torch.device("cpu"))
             log.info(f"Using Fixed Conditioning: {target_condition.mean().item():.4f}")
 
@@ -472,14 +591,15 @@ def run_active_learning(config_path: str) -> int:
     if "phi_psi" in val_data:
         val_phi_psi = val_data["phi_psi"].cpu().numpy()
     else:
-        meta_path = Path(data_cfg.get("meta_path", "data/processed/ala2/meta.pt"))
-        meta = torch.load(meta_path)
-        pdb_path = Path(meta.get("pdb_path", "data/raw/alanine-dipeptide-nowater.pdb"))
-        if pdb_path.exists():
-            val_phi_psi = _compute_phi_psi(val_data["positions"].to(device), pdb_path)
+        # PDB Path handling for Reference data check
+        pdb_path = Path(data_cfg.get("pdb_path", "data/raw/alanine-dipeptide-nowater.pdb"))
+        if torsion_indices is not None:
+             val_phi_psi = _compute_phi_psi(val_data["positions"].to(device), torsion_indices=torsion_indices)
+        elif pdb_path.exists():
+             val_phi_psi = _compute_phi_psi(val_data["positions"].to(device), pdb_path=pdb_path)
         else:
-            log.warning("PDB not found at %s. Val Phi/Psi will be None.", pdb_path)
-            val_phi_psi = None
+             log.warning("PDB not found and no torsion indices. Val Phi/Psi will be None.")
+             val_phi_psi = None
 
     rmsd_thresh = float(al_cfg.get("rmsd_thresh", 0.75))
     _, val_medoids_idx, _ = greedy_cluster(val_data["positions"], rmsd_thresh=rmsd_thresh)
@@ -509,6 +629,7 @@ def run_active_learning(config_path: str) -> int:
             grad_clip=float(train_cfg.get("grad_clip", 1.0)),
             rot_aug=bool(train_cfg.get("rot_aug", True)),
             iter_idx=0,
+            chirality_config=chirality_config,
         )
         _save_checkpoint(state["member_dir"], state, iter_idx=0, cfg=cfg)
         _save_member_logs(state["member_dir"], state["logs"])
@@ -516,7 +637,7 @@ def run_active_learning(config_path: str) -> int:
     iter_dir = run_root / "iter_00"
     iter_dir.mkdir(parents=True, exist_ok=True)
     eval_seed = int(al_cfg.get("seed", train_cfg.get("seed", 0)))
-    metrics = _evaluate(ensemble, diffusion, atom_types, val_phi_psi, val_medoids, cfg, iter_dir, eval_seed, condition=target_condition)
+    metrics = _evaluate(ensemble, diffusion, atom_types, val_phi_psi, val_medoids, cfg, iter_dir, eval_seed, condition=target_condition, constraints=constraints, chirality_config=chirality_config, torsion_indices=torsion_indices)
     metrics.update(
         {
             "iter": 0,
@@ -552,6 +673,8 @@ def run_active_learning(config_path: str) -> int:
             steps=int(al_cfg.get("sample_steps", 100)),
             eta=float(al_cfg.get("sample_eta", 0.0)),
             condition=target_condition,
+            constraints=constraints,
+            chirality_config=chirality_config,
         )
         
         # UNSCALE generated samples before saving/using
@@ -645,6 +768,7 @@ def run_active_learning(config_path: str) -> int:
                 grad_clip=float(train_cfg.get("grad_clip", 1.0)),
                 rot_aug=bool(train_cfg.get("rot_aug", True)),
                 iter_idx=iter_idx,
+                chirality_config=chirality_config,
             )
             _save_checkpoint(state["member_dir"], state, iter_idx=iter_idx, cfg=cfg)
             _save_member_logs(state["member_dir"], state["logs"])
@@ -659,6 +783,8 @@ def run_active_learning(config_path: str) -> int:
             iter_dir,
             eval_seed + 1000 + iter_idx,
             condition=target_condition,
+            constraints=constraints,
+            chirality_config=chirality_config,
         )
         metrics.update(
             {

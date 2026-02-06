@@ -3,7 +3,7 @@ import math
 import torch
 import torch.nn as nn
 from dataclasses import dataclass
-from typing import Dict, Tuple, Optional
+from typing import Dict, Tuple, Optional, List
 
 def center(x: torch.Tensor) -> torch.Tensor:
     """Centers coordinates to COM=0."""
@@ -44,104 +44,114 @@ def apply_rotation(x: torch.Tensor, R: torch.Tensor) -> torch.Tensor:
     # Let's use einsum for clarity: "bij,bnj->bni" matches R * x^T
     return torch.einsum("bij,bnj->bni", R, x)
 
-def constrain_chirality(x: torch.Tensor, scale_factor: float = 1.0) -> torch.Tensor:
+def constrain_chirality(x: torch.Tensor, chirality_config: Optional[List[Dict]] = None) -> torch.Tensor:
     """
-    Enforces L-Alanine Chirality via Geometric Reflection.
+    Enforces Chirality via Geometric Reflection based on provided config.
+    
+    Args:
+        x: [B, N, 3]
+        chirality_config: List of dicts, each containing:
+            'center_idx': int
+            'n_idx': int (neighbor 1)
+            'ca_idx': int (neighbor 2, usually the center if def is diff)
+            'c_idx': int (neighbor 3)
+            'cb_idx': int (atom to move)
+            'sign': float (+1 or -1, desired sign of volume)
+            
+            # Volume = (r_cb - r_center) . ((r_n - r_center) x (r_c - r_center))
+            # Or consistent definition with features.py
     """
-    if x.shape[1] != 10:
+    if chirality_config is None or len(chirality_config) == 0:
         return x
         
-    # Indices
-    idx_N, idx_CA, idx_CB, idx_C = 3, 4, 5, 6
-    
-    r_CA = x[:, idx_CA]
-    r_N = x[:, idx_N]
-    r_CB = x[:, idx_CB]
-    r_C = x[:, idx_C]
-    
-    # Plane defined by N, CA, C
-    v_N = r_N - r_CA
-    v_C = r_C - r_CA
-    
-    # Normal to plane (Unnormalized cross product gives 2*Area direction)
-    # Note: We use C x N to match the sign of features.py (N . (CB x C))
-    # vol = CB . (C x N) = N . (CB x C) = V_feat
-    plane_normal = torch.cross(v_C, v_N, dim=-1) # [B, 3]
-    
-    # Check "Side" of CB
-    v_CB = r_CB - r_CA
-    
-    # Scalar Triple Product (Volume propto)
-    vol = torch.sum(v_CB * plane_normal, dim=-1) # [B]
-    
-    # Identify False Chirality (Vol > 0 for D-Ala, we want < 0 for L-Ala)
-    # Mask [B]
-    mask = (vol > 0).float().unsqueeze(-1) # [B, 1]
-    
-    if mask.sum() == 0:
-        return x
+    for cfg in chirality_config:
+        idx_center = cfg['center_idx']
+        # Use explicit plane/target if available
+        if 'chiral_plane' in cfg and 'chiral_target' in cfg:
+            idx_n_plane = cfg['chiral_plane'] # [N, C]
+            idx_target = cfg['chiral_target'] # CB
+            idx_neighbors = idx_n_plane # For variable name compat below
+        else:
+             continue # Skip if not fully defined
+
+        desired_sign = cfg.get('expected_sign', -1.0)
         
-    # Reflection Logic
-    # r_new = r - 2 * (r . n) * n / |n|^2
-    # Here vector r is v_CB. Vector n is plane_normal.
-    
-    # Normalize plane normal for easier projection
-    n_norm = torch.nn.functional.normalize(plane_normal, dim=-1)
-    
-    # Projection of CB onto Normal
-    # dot [B, 1]
-    dot = torch.sum(v_CB * n_norm, dim=-1, keepdim=True)
-    
-    # Reflection vector (Perpendicular component * 2)
-    # moves CB to the other side
-    reflection = 2 * dot * n_norm
-    
-    # Apply reflection only to D-enantiomers
-    # Only move CB!
-    # Update x
-    delta = mask * reflection
-    x[:, idx_CB] = x[:, idx_CB] - delta
-    
+        r_center = x[:, idx_center]
+        
+        idx_n, idx_c = idx_neighbors[0], idx_neighbors[1]
+        
+        r_cb = x[:, idx_target]
+        
+        v_1 = x[:, idx_n] - r_center
+        v_2 = x[:, idx_c] - r_center
+        v_target = r_cb - r_center
+        
+        # Normal
+        plane_normal = torch.cross(v_2, v_1, dim=-1) # [B, 3]
+        
+        # Volume
+        vol = torch.sum(v_target * plane_normal, dim=-1) # [B]
+        
+        # Check against desired sign
+        # If desired is negative (L-Ala logic in original was vol < 0 is Good?)
+        # Original: mask = (vol > 0).float() -> So vol>0 was BAD (D-Ala). 
+        # So desired is <= 0.
+        
+        mask = None
+        if desired_sign < 0:
+             mask = (vol > 0).float().unsqueeze(-1)
+        else:
+             mask = (vol < 0).float().unsqueeze(-1)
+             
+        if mask.sum() == 0:
+            continue
+            
+        # Reflection
+        n_norm = torch.nn.functional.normalize(plane_normal, dim=-1)
+        dot = torch.sum(v_target * n_norm, dim=-1, keepdim=True)
+        reflection = 2 * dot * n_norm
+        
+        delta = mask * reflection
+        # Update IN PLACE
+        x[:, idx_target] = x[:, idx_target] - delta
+        
     return x
 
-def constrain_bonds(x: torch.Tensor, scale_factor: float = 1.0) -> torch.Tensor:
+def constrain_bonds(x: torch.Tensor, constraints: Optional[torch.Tensor] = None, scale_factor: float = 1.0) -> torch.Tensor:
     """
-    Projects backbone bonds (N-CA, CA-C) to target lengths.
-    Indices: N=3, CA=4, C=6.
+    Projects bonds to target lengths.
+    
+    Args:
+        x: [B, N, 3]
+        constraints: [K, 3] Tensor where each row is (atom_i, atom_j, length).
+                     Indices should be integers, length in same units as x (usually nm).
     """
-    # Valid only for Ala2 (10 atoms)
-    if x.shape[1] != 10:
+    if constraints is None or constraints.shape[0] == 0:
         return x
-    
-    # Constraints (nm)
-    # Standard lengths from template
-    t_ch3_c  = 0.152 * scale_factor # 0-1 (CH3-C)
-    t_c_o    = 0.123 * scale_factor # 1-2 (C=O)
-    t_c_n    = 0.133 * scale_factor # 1-3 (C-N)
-    
-    t_n_ca   = 0.146 * scale_factor # 3-4 (N-CA)
-    t_ca_cb  = 0.153 * scale_factor # 4-5 (CA-CB)
-    t_ca_c   = 0.151 * scale_factor # 4-6 (CA-C)
-    
-    t_c_o_2  = 0.123 * scale_factor # 6-7 (C=O)
-    t_c_n_2  = 0.133 * scale_factor # 6-8 (C-N)
-    t_n_c    = 0.146 * scale_factor # 8-9 (N-C)
-
-    constraints = [
-        (0, 1, t_ch3_c),
-        (1, 2, t_c_o),
-        (1, 3, t_c_n),
-        (3, 4, t_n_ca),
-        (4, 5, t_ca_cb),
-        (4, 6, t_ca_c),
-        (6, 7, t_c_o_2),
-        (6, 8, t_c_n_2),
-        (8, 9, t_n_c)
-    ]
-    
+        
     # Iterative projection
-    for _ in range(10):
-        for i1, i2, dist_target in constraints:
+    # Constraints: Tensor [K, 3] -> (idx1, idx2, dist)
+    # We can vectorize this loop if K is large, but K is usually small (N_atoms).
+    # Simple loop is fine.
+    
+    for _ in range(10): # 10 iterations usually enough for SHAKE-like convergene
+        # Process constraints in batch?
+        # A simple sequential application is standard for simple SHAKE.
+        
+        # To avoid python loop overhead, we can try to vectorize across constraints?
+        # But indices differ. 
+        # Let's keep loop for now, it's compiled by JIT/fast enough for small molecules.
+        
+        for k in range(constraints.shape[0]):
+            i1 = int(constraints[k, 0].item())
+            i2 = int(constraints[k, 1].item())
+            # Target dist is UN-SCALED in topology, but x is SCALED?
+            # Usually diffusion works in scaled space.
+            # If topology returns nm, and we work in normalized space, we must apply scale factor.
+            
+            # Assuming constraints are in PHYSICAL nm.
+            dist_target = constraints[k, 2] * scale_factor
+            
             p1 = x[:, i1]
             p2 = x[:, i2]
             diff = p2 - p1
@@ -271,7 +281,7 @@ class GaussianDiffusion(nn.Module):
         return loss, {"mse": loss.item()}
 
     @torch.no_grad()
-    def p_sample_loop(self, model: nn.Module, shape: Tuple[int, ...], h: torch.Tensor, steps: Optional[int] = None, model_kwargs: Optional[Dict] = None) -> torch.Tensor:
+    def p_sample_loop(self, model: nn.Module, shape: Tuple[int, ...], h: torch.Tensor, steps: Optional[int] = None, model_kwargs: Optional[Dict] = None, constraints: Optional[torch.Tensor] = None, chirality_config: Optional[List[Dict]] = None) -> torch.Tensor:
         """
         DDPM Sampling (Stochastic).
         """
@@ -310,10 +320,10 @@ class GaussianDiffusion(nn.Module):
                 xt = mean
                 
             # Enforce constraints
-            # 1. Chirality (Push to L-basin)
-            xt = constrain_chirality(xt, scale_factor=self.cfg.scale_factor)
-            # 2. Bonds (Fix lengths)
-            xt = constrain_bonds(xt, scale_factor=self.cfg.scale_factor)
+            # 1. Chirality
+            xt = constrain_chirality(xt, chirality_config=chirality_config)
+            # 2. Bonds
+            xt = constrain_bonds(xt, constraints=constraints, scale_factor=self.cfg.scale_factor)
             
             if self.cfg.recenter_every_step:
                 xt = center(xt)
@@ -321,7 +331,7 @@ class GaussianDiffusion(nn.Module):
         return xt
 
     @torch.no_grad()
-    def ddim_sample_loop(self, model: nn.Module, shape: Tuple[int, ...], h: torch.Tensor, steps: int = 50, eta: float = 0.0, model_kwargs: Optional[Dict] = None) -> torch.Tensor:
+    def ddim_sample_loop(self, model: nn.Module, shape: Tuple[int, ...], h: torch.Tensor, steps: int = 50, eta: float = 0.0, model_kwargs: Optional[Dict] = None, constraints: Optional[torch.Tensor] = None, chirality_config: Optional[List[Dict]] = None) -> torch.Tensor:
         """
         DDIM Sampling.
         """
@@ -365,10 +375,10 @@ class GaussianDiffusion(nn.Module):
             xt = torch.sqrt(alpha_bar_prev) * pred_x0 + dir_xt + sigma * noise
             
             # Enforce constraints
-            # 1. Chirality (Push to L-basin)
-            xt = constrain_chirality(xt, scale_factor=self.cfg.scale_factor)
-            # 2. Bonds (Fix lengths)
-            xt = constrain_bonds(xt, scale_factor=self.cfg.scale_factor)
+            # 1. Chirality
+            xt = constrain_chirality(xt, chirality_config=chirality_config)
+            # 2. Bonds
+            xt = constrain_bonds(xt, constraints=constraints, scale_factor=self.cfg.scale_factor)
             
             if self.cfg.recenter_every_step:
                 xt = center(xt)
