@@ -22,6 +22,7 @@ def main():
     parser.add_argument("--keep-percent", type=float, default=1.0)
     parser.add_argument("--output-formats", nargs='+', default=['pdb', 'lammps_data'], 
                         help="List of output formats: pdb, gro, xyz, lammps_dump, lammps_data")
+    parser.add_argument("--topology", type=str, default=None, help="Path to topology for generalized sampling")
     
     args = parser.parse_args()
     
@@ -38,7 +39,8 @@ def main():
         seed=args.seed,
         warmup_steps=args.warmup_steps,
         keep_percent=args.keep_percent,
-        output_formats=args.output_formats
+        output_formats=args.output_formats,
+        topology_path=args.topology
     )
 
 if __name__ == "__main__":

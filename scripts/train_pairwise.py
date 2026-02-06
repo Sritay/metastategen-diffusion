@@ -29,8 +29,7 @@ class EnergyDataset(Dataset):
         
         # Data Loading Strategy:
         # We expect the user to provide paths to forces and energies [.pt files].
-        # We infer the positions path or expect it to be handled by the specific dataset preparation.
-        # For TimeWarp data, positions should be 22-atom all-atom structures.
+        # We infer the positions path. Positions should match the atom count of the system.
         
         self.shard_paths = sorted(glob.glob(f"{shard_dir}/*.pt"))
         if not self.shard_paths:
@@ -39,7 +38,7 @@ class EnergyDataset(Dataset):
 
         # Loading massive arrays to memory directly (Fastest for < 2GB data)
         log.info(f"Loading forces: {forces_path}")
-        self.forces = torch.load(forces_path) # [N, 22, 3] or [N, 66]
+        self.forces = torch.load(forces_path) # [N, n_atoms, 3]
         log.info(f"Loading energies: {energies_path}")
         self.energies = torch.load(energies_path) # [N]
         
@@ -92,6 +91,10 @@ def main():
     # We create a simple ephemeral dataset since we don't have the config boilerplate
     full_ds = EnergyDataset(None, args.forces, args.energies)
     
+    # Infer n_atoms from dataset
+    # Position shape is [N, n_atoms, 3]
+    n_atoms = full_ds.positions.shape[1]
+    
     # Split 80/20
     n_total = len(full_ds)
     n_train = int(0.8 * n_total)
@@ -112,8 +115,9 @@ def main():
     f_std = all_forces.std().to(device)
     
     log.info(f"Stats - E_mean: {e_mean:.2f}, E_std: {e_std:.2f}, F_std: {f_std:.2f}")
+    log.info(f"Initializing PairwiseEnergyModel with n_atoms={n_atoms}")
     
-    model = PairwiseEnergyModel(n_atoms=22).to(device)
+    model = PairwiseEnergyModel(n_atoms=n_atoms).to(device)
     opt = torch.optim.Adam(model.parameters(), lr=args.lr)
     
     out_path = Path(args.out_dir)

@@ -116,15 +116,17 @@ def save_outputs(
     positions: torch.Tensor,
     out_dir: Union[str, Path],
     formats: List[str],
-    prefix: str = "refined"
+    prefix: str = "refined",
+    topology: Optional[md.Topology] = None
 ):
     """
     Saves positions in requested formats.
     
     Args:
-        positions: [B, 22, 3] tensor of coordinates (nm)
+        positions: [B, N, 3] tensor of coordinates (nm)
         out_dir: Output directory
         formats: List of formats ('pdb', 'gro', 'xyz', 'lammps_dump', 'lammps_data')
+        topology: Optional mdtraj Topology. If None, defaults to hardcoded Ala2.
     """
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -133,7 +135,11 @@ def save_outputs(
     pos_np = positions.cpu().numpy()
     
     # Get Topology
-    top = get_ala2_topology()
+    if topology is None:
+        log.warning("No topology provided to save_outputs. Defaulting to hardcoded Ala2 (22 atoms).")
+        top = get_ala2_topology()
+    else:
+        top = topology
     
     # Create Trajectory
     traj = md.Trajectory(pos_np, top)

@@ -8,10 +8,11 @@ from pathlib import Path
 
 from metastategen.utils import get_logger, set_deterministic
 from metastategen.models.egnn import EGNN, EGNNConfig
-from metastategen.models.diffusion import GaussianDiffusion, DiffusionConfig
+from metastategen.models.diffusion import GaussianDiffusion, DiffusionConfig, constrain_bonds
 from metastategen.models.pairwise import PairwiseEnergyModel
 from metastategen.reconstruct import align_and_reconstruct
 from metastategen.utils import io_formats
+from metastategen.data.topology import MoleculeTopology
 
 log = get_logger("sample_refined")
 
@@ -59,9 +60,9 @@ def load_diffusion_model(config_path, ckpt_path, device):
         
     return model, diffusion, cfg
 
-def load_pairwise_model(ckpt_path, device):
+def load_pairwise_model(ckpt_path, device, n_atoms):
     # Fixed Pairwise Config
-    model = PairwiseEnergyModel(n_atoms=22).to(device)
+    model = PairwiseEnergyModel(n_atoms=n_atoms).to(device)
     
     stats = {}
     if ckpt_path.exists():
@@ -73,33 +74,14 @@ def load_pairwise_model(ckpt_path, device):
         stats['f_std'] = d['f_std'].to(device)
     else:
         log.warning(f"Pairwise checkpoint not found at {ckpt_path}!")
+        # Default stats for random initialization testing
+        stats['e_mean'] = torch.tensor(0.0).to(device)
+        stats['e_std'] = torch.tensor(1.0).to(device)
+        stats['f_std'] = torch.tensor(1.0).to(device)
         
     return model, stats
 
-def constrain_bonds_22(x):
-    """
-    Projects backbone bonds (N-CA, CA-C) to target lengths for 22-atom Timewarp structure.
-    Indices: N=6, CA=8, C=14.
-    """
-    t1 = 0.146 # N-CA
-    t2 = 0.151 # CA-C
-    
-    constraints = [
-        (6, 8, t1),
-        (8, 14, t2)
-    ]
-    
-    # Iterative projection
-    for _ in range(5):
-        for i1, i2, dist_target in constraints:
-            p1 = x[:, i1]
-            p2 = x[:, i2]
-            diff = p2 - p1
-            dist = torch.norm(diff, dim=1, keepdim=True) + 1e-8
-            delta = diff * (dist_target / dist - 1.0)
-            x[:, i1] -= 0.5 * delta
-            x[:, i2] += 0.5 * delta
-    return x
+# constrain_bonds_22 removed in favor of generalized constrain_bonds from diffusion.py
 
 def run_sampling(
     diff_config: str,
@@ -115,6 +97,7 @@ def run_sampling(
     warmup_steps: int = 1000,
     keep_percent: float = 1.0,
     output_formats: list[str] = None,
+    topology_path: str = None,
 ):
     if output_formats is None:
         output_formats = []
@@ -125,32 +108,50 @@ def run_sampling(
     # Ensure output directory exists
     Path(out_dir).mkdir(parents=True, exist_ok=True)
 
+    if topology_path is None:
+        # Fallback
+        topology_path = "data/raw/alanine-dipeptide-nowater.pdb"
+        log.warning(f"No topology_path provided. Defaulting to {topology_path}")
+
+    # Initialize Topology
+    topo = MoleculeTopology(topology_path)
+    log.info(f"Loaded topology: {topo.n_atoms} atoms, {len(topo.heavy_indices)} heavy atoms.")
+
     # 1. Load Diffusion
-    # Load model using standard config keys.
     diff_model, diffusion, diff_cfg = load_diffusion_model(Path(diff_config), Path(diff_ckpt), device)
     diff_model.eval()
     
-    # 2. Load Pairwise Force
-    force_model, f_stats = load_pairwise_model(Path(force_ckpt), device)
+    # 2. Load Pairwise Force (Dynamic n_atoms)
+    force_model, f_stats = load_pairwise_model(Path(force_ckpt), device, n_atoms=topo.n_atoms)
     force_model.eval()
     
-    # 3. Setup Template for Reconstruction
-    # Load first frame of 22-atom data
-    templ_path = Path("data/timewarp/train/positions.pt")
-    if not templ_path.exists():
-        raise FileNotFoundError(f"Template not found at {templ_path}")
+    # 3. Setup Template for Reconstruction (Dynamic)
+    # Load template from file used for topology
+    import mdtraj as md
+    traj_templ = md.load(topology_path)
+    templ_all = torch.tensor(traj_templ.xyz[0], dtype=torch.float32).to(device) * 1.0 
     
-    templ_all = torch.load(templ_path)[0].to(device) # [22, 3]
-    heavy_indices = [1, 4, 5, 6, 8, 10, 14, 15, 16, 18]
+    heavy_indices = topo.heavy_indices
     
+    # Derive global constraints for refinement
+    # topo.infer_constraints() returns indices relative to HEAVY atoms by default?
+    # No, let's assume valid remapping.
+    # We need constraints for the WHOLE molecule.
+    # Workaround: map inferred heavy constraints to global indices
+    cons_local = topo.infer_constraints() 
+    constraints_global = []
+    for row in cons_local:
+        i_sub, j_sub, d = int(row[0]), int(row[1]), float(row[2])
+        if i_sub < len(heavy_indices) and j_sub < len(heavy_indices):
+             i_global = heavy_indices[i_sub]
+             j_global = heavy_indices[j_sub]
+             constraints_global.append([i_global, j_global, d])
+        
+    constraints_tensor = torch.tensor(constraints_global, device=device)
+    log.info(f"Refinement Constraints: {len(constraints_tensor)} bonds")
+
     # Atom types for diffusion
-    # Generate batch of atom types (10 atoms)
-    # We need the 10 atom types for diffusion conditioning.
-    # Usually [C, C, O, N, C, C, C, O, N, C]
-    # Indices: 0=C, 1=N, 2=O, 3=?, 4=?
-    # Let's peek at a shard to preserve exact mapping.
-    shard_path = next(Path("data/processed/ala2/shards").glob("*.pt"))
-    diff_types = torch.load(shard_path)['atom_types'].to(device) # [10]
+    diff_types = topo.get_atom_types().to(device)
 
     all_samples = []
     # Adjust n_batches: If filtering, we process input batch size fully, then reduce.
@@ -170,20 +171,21 @@ def run_sampling(
         
         # A. Diffusion
         a_batch = diff_types.unsqueeze(0).expand(B, -1)
-        shape = (B, 10, 3)
+        shape = (B, len(heavy_indices), 3)
         
         with torch.no_grad():
-            x_10 = diffusion.p_sample_loop(diff_model, shape, a_batch)
-            x_10 = x_10 / diffusion.cfg.scale_factor
+            x_gen = diffusion.p_sample_loop(diff_model, shape, a_batch)
+            x_gen = x_gen / diffusion.cfg.scale_factor
             
-        # B. Reconstruction (10 -> 22)
-        x_22 = align_and_reconstruct(x_10, templ_all, heavy_indices)
+        # B. Reconstruction (Backbone -> All)
+        # RENAMED: x_10 -> x_gen, x_22 -> x_recon
+        x_recon = align_and_reconstruct(x_gen, templ_all, heavy_indices)
         
         # Store initial *before* any refinement
-        initial_samples.append(x_22.clone().cpu()) 
+        initial_samples.append(x_recon.clone().cpu()) 
         
         # C. Warmup Phase
-        x_curr = x_22.clone().to(device).requires_grad_(True)
+        x_curr = x_recon.clone().to(device).requires_grad_(True)
         
         warmup_k = warmup_steps
         main_k = refinement_steps - warmup_k
@@ -201,7 +203,7 @@ def run_sampling(
 
                 with torch.no_grad():
                     x_curr.data += step_size * f_pred
-                    x_curr.data = constrain_bonds_22(x_curr.data)
+                    x_curr.data = constrain_bonds(x_curr.data, constraints_tensor)
 
         # D. Filtering
         if keep_percent < 1.0:
@@ -239,7 +241,7 @@ def run_sampling(
                      log.info(f"Main Step {k}: E_norm={e_norm.mean().item():.2f} | Force_norm_pre={f_norm.mean().item():.2f}")
                 
                 x_curr.data += step_size * f_pred
-                x_curr.data = constrain_bonds_22(x_curr.data)
+                x_curr.data = constrain_bonds(x_curr.data, constraints_tensor)
                     
         refined_samples.append(x_curr.detach().cpu())
         
@@ -272,14 +274,16 @@ def run_sampling(
              torch.cat(refined_samples, dim=0),
              out_dir,
              output_formats,
-             prefix="refined"
+             prefix="refined",
+             topology=traj_templ.topology
         )
         # Save initial
         io_formats.save_outputs(
              torch.cat(initial_samples, dim=0),
              out_dir,
              output_formats,
-             prefix="initial"
+             prefix="initial",
+             topology=traj_templ.topology
         )
 
     return 0
