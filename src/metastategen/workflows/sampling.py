@@ -28,8 +28,8 @@ def load_diffusion_model(config_path, ckpt_path, device):
         rbf_dim=cfg['model'].get('rbf_dim', 64),
         rbf_cutoff=cfg['model'].get('rbf_cutoff', 1.0)
     )
-    # Hardcoded for 10-atom backbone models (Active Learning Loop 5 used 3 types: C, O, N)
-    n_atom_types = 3 
+    # Read n_atom_types from config, default to 3 (C, O, N)
+    n_atom_types = cfg.get('model', {}).get('n_atom_types', 3) 
     
     model = EGNN(
         n_atom_types=n_atom_types,
