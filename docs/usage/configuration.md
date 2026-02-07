@@ -46,6 +46,7 @@ A standard config file (`configs/*.yaml`) is divided into these blocks:
 | Parameter | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
 | `type` | str | "egnn" | Model architecture. |
+| `n_atom_types` | int | Auto | Number of atom types (Auto-inferred from data/checkpoint). |
 | `n_layers` | int | 6 | Number of EGNN layers. |
 | `hidden_dim` | int | 128 | Feature dimension size ($h$). |
 | `time_emb_dim` | int | 128 | Dimension for time embeddings. |
@@ -101,6 +102,7 @@ The `msgen sample` command works differently. Instead of a YAML file, it uses di
 | :--- | :--- | :--- |
 | `--diff-ckpt` | Path to trained Diffusion checkpoint | **Required** |
 | `--force-ckpt` | Path to trained Force/Energy checkpoint | **Required** |
+| `--topology` | Path to PDB file for reconstruction | **Required** |
 | `--out-dir` | Output directory for results | **Required** |
 | `--n-samples` | Number of structures to generate | 1000 |
 | `--batch-size` | Batch size for sampling | 100 |

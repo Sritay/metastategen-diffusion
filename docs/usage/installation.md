@@ -7,6 +7,10 @@ nav_order: 1
 
 # Installation
 
+[< Back: Usage Index](../usage.md) | [Next: Verification >](verification.md)
+
+---
+
 ## 1. Clone the Repository
 ```bash
 git clone https://github.com/Sritay/metastategen-diffusion.git
@@ -25,7 +29,7 @@ source .venv/bin/activate
 pip install --upgrade pip
 
 # Install Package (Editable mode)
-# This automatically installs dependencies (numpy, torch, etc.) defined in pyproject.toml
+# This automatically installs dependencies (numpy, torch, mdtraj, etc.) defined in pyproject.toml
 pip install -e .
 ```
 
@@ -44,3 +48,7 @@ This sequence:
 1. Downloads raw MD data to `data/raw`.
 2. Processes it into unified PyTorch shards in `data/processed/ala2`.
 3. Generates the Seed, Pool, and Validation splits required for Active Learning.
+
+---
+
+[< Back: Usage Index](../usage.md) | [Next: Verification >](verification.md)

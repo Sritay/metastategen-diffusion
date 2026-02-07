@@ -41,7 +41,10 @@ msgen train --config configs/ala2_default.yaml
 ```
 
 ### Force Field Surrogate
-(See `scripts/train_pairwise.py` - currently not exposed via `msgen` CLI but available in scripts).
+Train the pairwise energy model using the generalized trainer (supports NPZ or directory of PT files):
+```bash
+python scripts/train_pairwise.py --data-source data/my_molecule.npz --out_dir runs/my_energy_model
+```
 
 ---
 

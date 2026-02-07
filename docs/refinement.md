@@ -15,12 +15,12 @@ The Refinement Loop converts the coarse, generated backbones into physically val
 
 ### Step 1: Template Alignment & Reconstruction
 *   **Function**: `align_and_reconstruct` (from `metastategen.reconstruct`)
-*   **Input**: 10-atom backbone from Diffusion ($X_{gen}$).
+*   **Input**: Backbone atoms from Diffusion ($X_{gen}$).
 *   **Algorithm**: Kabsch Algorithm.
-    1.  We take a reference Ideal Alanine Dipeptide template (22 atoms).
-    2.  We extract its 10 backbone atoms.
+    1.  We take a reference template structure (specified via `--topology`).
+    2.  We extract its backbone atoms (identified via `mdtraj`).
     3.  We compute the optimal Rotation $R$ and Translation $T$ to align the template backbone to $X_{gen}$.
-    4.  We apply $(R, T)$ to the **full** 22-atom template.
+    4.  We apply $(R, T)$ to the **full** template.
     5.  **Critical Step**: We overwrite the backbone positions with $X_{gen}$ to preserve the diffusion model's generated conformation, while keeping side-chains attached rigidly.
 
 ### Step 2: Warm-up Phase (Geometric Correction)
