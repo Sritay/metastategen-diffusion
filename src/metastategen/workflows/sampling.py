@@ -158,6 +158,7 @@ def run_sampling(
     output_formats: list[str] = None,
     topology_path: str = None,
     refinement_mode: str = "mlip", # "mlip" or "geometric"
+    connectivity_path: str = None, # Path to PSF/GRO if needed for bonds
 ):
     if output_formats is None:
         output_formats = []
@@ -174,7 +175,7 @@ def run_sampling(
         log.warning(f"No topology_path provided. Defaulting to {topology_path}")
 
     # Initialize Topology
-    topo = MoleculeTopology(topology_path)
+    topo = MoleculeTopology(topology_path, topology_path=connectivity_path)
     log.info(f"Loaded topology: {topo.n_atoms} atoms, {len(topo.heavy_indices)} heavy atoms.")
 
     # 1. Load Diffusion
