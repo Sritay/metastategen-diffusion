@@ -32,14 +32,23 @@ A standard config file (`configs/*.yaml`) is divided into these blocks:
 
 ### `data` Section
 
+This section controls data loading.
+
+**Mode A: Generalized / Auto-Split** (Recommended for Standard Training & AL Auto-start)
 | Parameter | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
-| `seed_path` | str | Required | Path to the initial labeled dataset (`.pt`). |
-| `val_path` | str | Required | Path to the validation dataset (`.pt`). |
-| `pool_path` | str | Required | Path to the unlabeled pool (`.pt`). |
+| `npz_path` | str | **Required** | Path to NPZ file containing positions. |
+| `pdb_path` | str | **Required** | Path to PDB file for toplogy inference. |
+| `scale_factor` | float | 1.0 | Global scaling factor for coordinates. |
+
+**Mode B: Pre-Split** (For AL Resuming or Manual Splits)
+| Parameter | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `seed_path` | str | Optional | Path to the initial labeled dataset (`.pt`). |
+| `val_path` | str | Optional | Path to the validation dataset (`.pt`). |
+| `pool_path` | str | Optional | Path to the unlabeled pool (`.pt`). |
 | `batch_size` | int | 256 | Batch size for training. |
 | `num_workers` | int | 4 | DataLoader workers (use 0 for debugging). |
-| `scale_factor` | float | 1.0 | Global scaling factor for coordinates (e.g. `7.6`). |
 
 ### `model` Section
 

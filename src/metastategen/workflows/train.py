@@ -8,114 +8,157 @@ import torch.nn as nn
 from pathlib import Path
 import pandas as pd
 import time
+from typing import Optional
 
 from metastategen.utils import get_logger, set_deterministic
-from metastategen.data import Ala2Dataset
-from metastategen.models.egnn import EGNN, EGNNConfig
-from metastategen.models.diffusion import GaussianDiffusion, DiffusionConfig
+from metastategen.models.ensemble import build_diffusion_from_cfg, build_model_from_cfg
+from metastategen.data import load_npz_as_al_data, ALDataManager
+from metastategen.data.topology import MoleculeTopology
+from metastategen.workflows.common import (
+    _resolve_run_root,
+    _build_dataloader,
+    _save_checkpoint,
+    _save_member_logs,
+    _train_member,
+)
 
 log = get_logger("train")
 
-def run_training(config_path: str):
+def run_training(config_path: str) -> int:
     with open(config_path, 'r') as f:
         cfg = yaml.safe_load(f)
 
-    set_deterministic(cfg['train']['seed'])
+    # Use resolve_run_root for consistent output directory handling
+    # train.py config usually has 'train' -> 'out_dir' or similar. 
+    # _resolve_run_root checks active_learning.exp_id, active_learning.out_dir, 
+    # then falls back to train.exp_id, train.out_dir.
+    run_root = _resolve_run_root(cfg)
+    run_root.mkdir(parents=True, exist_ok=True)
+    
+    # Save config
+    with (run_root / "config.yaml").open("w") as f:
+        yaml.safe_dump(cfg, f, sort_keys=False)
+
+    train_cfg = cfg.get("train", {})
+    data_cfg = cfg.get("data", {})
+    
+    seed = int(train_cfg.get("seed", 0))
+    set_deterministic(seed)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     log.info(f"Device: {device}")
 
-    # Data
-    ds_train = Ala2Dataset(
-        cfg['data']['data_dir'], 
-        trajs=cfg['data']['train_trajs'], 
-        subsample=cfg['data']['frame_subsample']
-    )
-    dl_train = torch.utils.data.DataLoader(
-        ds_train, 
-        batch_size=cfg['data']['batch_size'], 
-        shuffle=True, 
-        num_workers=cfg['data'].get('num_workers', 0)
-    )
-
-    # Model
-    # Get n_atom_types from dataset
-    n_atom_types = int(ds_train.atom_types.max().item()) + 1
+    # --- Data Loading (Generalized) ---
+    # We use load_npz_as_al_data to support arbitrary NPZ + PDB inputs
+    # Just like AL loop, but we won't do splitting, we just load 'train' data.
+    # 
+    # If users provide explicit paths in data_cfg, we use them.
+    # If they use the old 'data_dir' + 'train_trajs' style (Ala2Dataset), we might need to support that?
+    #
+    # Proposal: Support BOTH for backward compatibility, or switch to Generalized?
+    # The user request implies "make AL optional", suggesting we want the SAME capabilities as AL (generalized) but without the loop.
+    # So we should prioritize the Generalized Loader.
     
-    model_cfg = EGNNConfig(
-        n_layers=cfg['model']['n_layers'],
-        hidden_dim=cfg['model']['hidden_dim']
-    )
-    model = EGNN(
-        n_atom_types=n_atom_types,
-        hidden_dim=cfg['model']['hidden_dim'],
-        n_layers=cfg['model']['n_layers'],
-        time_emb_dim=cfg['model']['time_emb_dim'],
-        cfg=model_cfg
-    ).to(device)
-
-    diff_cfg = DiffusionConfig(
-        T=cfg['diffusion']['T'],
-        beta_start=cfg['diffusion']['beta_start'],
-        beta_end=cfg['diffusion']['beta_end'],
-        schedule=cfg['diffusion']['schedule'],
-        recenter_every_step=cfg['diffusion']['recenter_every_step']
-    )
-    diffusion = GaussianDiffusion(diff_cfg).to(device)
-
-    opt = torch.optim.Adam(model.parameters(), lr=float(cfg['train']['lr']))
-
-    # Setup output
-    out_dir = Path(cfg['train']['out_dir'])
-    ckpt_dir = out_dir / "checkpoints"
-    ckpt_dir.mkdir(parents=True, exist_ok=True)
+    npz_path = data_cfg.get("npz_path")
+    pdb_path = data_cfg.get("pdb_path")
     
-    log_path = out_dir / "train_log.csv"
-    logs = []
+    if npz_path and pdb_path:
+        log.info(f"Loading generalized data from {npz_path} and {pdb_path}")
+        scale_factor = float(data_cfg.get("scale_factor", 1.0))
+        raw_data = load_npz_as_al_data(Path(npz_path), Path(pdb_path))
+        
+        # In a normal training script, we might want to split into Train/Val manually or assume provided data is Train.
+        # For simplicity, let's treat the entire NPZ as training data.
+        # If user wants a split, they should pre-split or we add a 'val_split' arg?
+        # AL loop auto-splits. Here let's just train on provided data.
+        
+        # ALDataManager wrappers are useful for scale handling, so we reuse it?
+        # Yes, ALDataManager handles scaling and "PositionsDataset" creation.
+        manager = ALDataManager(raw_data, scale_factor=scale_factor)
+        
+        # Infer topology for n_atom_types and constraints
+        topo_path = data_cfg.get("topo_path", pdb_path)
+        topology = MoleculeTopology(topo_path)
+        chirality_config = topology.infer_chirality_config()
+        # Constraints are currently used in sampling, but maybe not in training loss (except implicitly via data)?
+        # Chirality features ARE used in training if model.cfg.use_chiral_features is True.
+        
+        n_atom_types = int(raw_data["atom_types"].max().item()) + 1
+        
+    else:
+        # Fallback? No, require updated config for generalized training.
+         raise ValueError("Missing data config. Provide 'npz_path' & 'pdb_path' (Generalized). Legacy Ala2Dataset support has been removed.")
 
-    epochs = cfg['train']['epochs']
+    # --- Model ---
+    model = build_model_from_cfg(cfg, n_atom_types=n_atom_types).to(device)
+    diffusion = build_diffusion_from_cfg(cfg).to(device)
+    opt = torch.optim.Adam(model.parameters(), lr=float(train_cfg.get("lr", 3e-4)))
     
-    log.info(f"Starting training for {epochs} epochs...")
+    # Setup State (similar to AL member state)
+    # But here we only have ONE model (no ensemble, or rather, just 1 "member")
+    state = {
+        "model": model,
+        "opt": opt,
+        "epoch": 0,
+        "logs": [],
+        "device": device,
+        "chirality_config": chirality_config
+    }
+    
+    training_dataset = manager.dataset() if manager else dataset
+    
+    batch_size = int(data_cfg.get("batch_size", 256))
+    num_workers = int(data_cfg.get("num_workers", 0))
+    
+    dl = _build_dataloader(
+        training_dataset,
+        batch_size=batch_size,
+        num_workers=num_workers,
+        seed=seed
+    )
+    
+    epochs = int(train_cfg.get("epochs", 100))
+    save_every = int(train_cfg.get("save_every", 10))
+    grad_clip = float(train_cfg.get("grad_clip", 1.0))
+    rot_aug = bool(train_cfg.get("rot_aug", True))
+    
+    log.info(f"Starting Normal Training for {epochs} epochs...")
+    
+    # We can reuse _train_member, but it loops for 'epochs'. 
+    # We want to save every X epochs.
+    # So we call _train_member for 1 epoch at a time inside our loop?
+    # Or strict reuse? _train_member runs for N epochs and saves logs.
+    # It does NOT save checkpoints internally during the loop (only afterwards in AL loop).
+    # So we should call it in a loop of our own.
     
     for epoch in range(1, epochs + 1):
-        model.train()
-        ep_losses = []
+        # Run 1 epoch
+        _train_member(
+            state,
+            diffusion,
+            dl,
+            epochs=1,
+            grad_clip=grad_clip,
+            rot_aug=rot_aug,
+            iter_idx=None, # Normal training doesn't use AL iters
+            chirality_config=chirality_config
+        )
         
-        for batch in dl_train:
-            x = batch['x'].to(device)
-            a = batch['a'].to(device) # [B, N] or [N] handled by model
-            
-            # Sample t
-            B = x.shape[0]
-            t = torch.randint(1, cfg['diffusion']['T'] + 1, (B,), device=device)
-            
-            loss, info = diffusion.training_loss(model, x, a, t, rot_aug=True)
-            
-            opt.zero_grad()
-            loss.backward()
-            nn.utils.clip_grad_norm_(model.parameters(), cfg['train']['grad_clip'])
-            opt.step()
-            
-            ep_losses.append(loss.item())
+        # Log to console
+        last_log = state["logs"][-1]
+        log.info(f"Epoch {epoch}/{epochs} | Loss: {last_log['train_loss']:.6f}")
+        
+        # Save Checkpoint
+        if epoch % save_every == 0:
+            _save_checkpoint(run_root, state, iter_idx=None, cfg=cfg)
+            # Also save logs periodically
+            _save_member_logs(run_root, state["logs"])
+            log.info(f"Saved checkpoint for epoch {epoch}")
 
-        avg_loss = sum(ep_losses) / len(ep_losses)
-        log.info(f"Epoch {epoch}/{epochs} | Loss: {avg_loss:.6f}")
-        
-        logs.append({"epoch": epoch, "loss": avg_loss})
-        
-        if epoch % cfg['train']['save_every'] == 0:
-            ckpt_path = ckpt_dir / f"ckpt_{epoch:04d}.pt"
-            torch.save({
-                'epoch': epoch,
-                'model': model.state_dict(),
-                'opt': opt.state_dict(),
-                'config': cfg
-            }, ckpt_path)
-            log.info(f"Saved checkpoint: {ckpt_path}")
-
-    pd.DataFrame(logs).to_csv(log_path, index=False)
+    # Final Save
+    final_path = run_root / "checkpoints" / "final.pt"
+    final_path.parent.mkdir(parents=True, exist_ok=True)
+    torch.save(model.state_dict(), final_path)
+    _save_member_logs(run_root, state["logs"])
     
-    # Save final
-    final_path = ckpt_dir / "final.pt"
-    torch.save(model.state_dict(), final_path) # Just weights for easier loading
-    log.info("Done.")
+    log.info(f"Done. Results in {run_root}")
     return 0

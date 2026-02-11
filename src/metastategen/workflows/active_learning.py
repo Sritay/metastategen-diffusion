@@ -37,11 +37,13 @@ from metastategen.data.topology import MoleculeTopology
 log = get_logger("run_al_loop")
 
 
-def _resolve_run_root(cfg: dict) -> Path:
-    al_cfg = cfg.get("active_learning", {})
-    exp_id = al_cfg.get("exp_id", "al_loop")
-    out_dir = al_cfg.get("out_dir", f"runs/{exp_id}")
-    return Path(out_dir)
+from metastategen.workflows.common import (
+    _resolve_run_root,
+    _build_dataloader,
+    _save_member_logs,
+    _save_checkpoint,
+    _train_member,
+)
 
 
 def _resolve_seeds(cfg: dict) -> list[int]:
@@ -54,91 +56,16 @@ def _resolve_seeds(cfg: dict) -> list[int]:
     return [base_seed + i for i in range(members)]
 
 
-def _build_dataloader(dataset, batch_size: int, num_workers: int, seed: int):
-    g = torch.Generator()
-    g.manual_seed(seed)
-    return torch.utils.data.DataLoader(
-        dataset,
-        batch_size=batch_size,
-        shuffle=True,
-        num_workers=num_workers,
-        generator=g,
-    )
 
 
-def _save_member_logs(member_dir: Path, logs: list[dict]) -> None:
-    if not logs:
-        return
-    keys = sorted({k for row in logs for k in row.keys()})
-    out_path = member_dir / "train_log.csv"
-    with out_path.open("w", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=keys)
-        writer.writeheader()
-        writer.writerows(logs)
 
 
-def _save_checkpoint(member_dir: Path, state: dict, iter_idx: int, cfg: dict) -> None:
-    ckpt_dir = member_dir / "checkpoints"
-    ckpt_dir.mkdir(parents=True, exist_ok=True)
-    ckpt = {
-        "iter": iter_idx,
-        "epoch": state["epoch"],
-        "model": state["model"].state_dict(),
-        "opt": state["opt"].state_dict(),
-        "config": cfg,
-    }
-    torch.save(ckpt, ckpt_dir / f"iter_{iter_idx:02d}.pt")
 
 
-def _train_member(
-    state: dict,
-    diffusion,
-    dataloader,
-    epochs: int,
-    grad_clip: float,
-    rot_aug: bool,
-    iter_idx: int,
-    chirality_config: list = None,
-) -> None:
-    model = state["model"]
-    opt = state["opt"]
-    device = state["device"]
-    chirality_config = state.get("chirality_config", None) # Retrieve from state if needed, or pass explicitly
 
-    start = time.time()
-    for _ in range(epochs):
-        state["epoch"] += 1
-        model.train()
-        losses = []
-        for batch in dataloader:
-            x = batch["x"].to(device)
-            a = batch["a"].to(device)
-            bsz = x.shape[0]
-            
-            # Compute Chiral Conditioning Signal (from CLEAN x)
-            # x is scaled by scale_factor, so we must tell the function to unscale it
-            scale_factor = diffusion.cfg.scale_factor
-            condition = None
-            if hasattr(model, "cfg") and getattr(model.cfg, "use_chiral_features", False):
-                 condition = compute_chiral_volume_signal(x, scale_factor=scale_factor, chirality_config=chirality_config)
-            
-            t = torch.randint(1, diffusion.cfg.T + 1, (bsz,), device=device)
-            loss, _ = diffusion.training_loss(model, x, a, t, rot_aug=rot_aug, condition=condition)
-            opt.zero_grad()
-            loss.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
-            opt.step()
-            losses.append(loss.item())
 
-        train_loss = float(sum(losses) / max(1, len(losses)))
-        state["logs"].append(
-            {
-                "iter": iter_idx,
-                "epoch": state["epoch"],
-                "train_loss": train_loss,
-                "elapsed_s": time.time() - start,
-            }
-        )
+
+
 
 
 @torch.no_grad()
