@@ -38,6 +38,7 @@ msgen sample \
 | `--diff-ckpt` | Required | Path to the trained Diffusion Model checkpoint (`.pt`). |
 | `--force-ckpt` | Optional | Path to the trained Pairwise Energy Model (Required if mode=`mlip`). |
 | `--refinement-mode` | `mlip` | Refinement Strategy: `mlip` (Force Field) or `geometric` (Clash Removal only). |
+| `--connectivity` | Optional | Path to PSF/GRO file. Essential for non-standard molecules (e.g. Lignin) to correctly infer bonds/rings. |
 | `--n-samples` | 100 | Number of structures to generate. |
 | `--batch-size` | 100 | Batch size for inference (adjust based on GPU memory). |
 | `--refinement-steps` | 2000 | Number of gradient descent steps. |
