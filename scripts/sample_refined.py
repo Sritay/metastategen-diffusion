@@ -24,6 +24,8 @@ def main():
                         help="List of output formats: pdb, gro, xyz, lammps_dump, lammps_data")
     parser.add_argument("--topology", type=str, default=None, help="Path to topology for generalized sampling")
     
+    parser.add_argument("--refinement-mode", type=str, default="mlip", choices=["mlip", "geometric"], help="Refinement type: 'mlip' (Force Field) or 'geometric' (Clash Removal)")
+    
     args = parser.parse_args()
     
     return run_sampling(
@@ -40,7 +42,8 @@ def main():
         warmup_steps=args.warmup_steps,
         keep_percent=args.keep_percent,
         output_formats=args.output_formats,
-        topology_path=args.topology
+        topology_path=args.topology,
+        refinement_mode=args.refinement_mode
     )
 
 if __name__ == "__main__":

@@ -6,6 +6,12 @@ from pathlib import Path
 from typing import List, Tuple, Optional, Dict
 from metastategen.utils import get_logger
 
+try:
+    import networkx as nx
+except ImportError:
+    nx = None
+
+
 log = get_logger("topology")
 
 class MoleculeTopology:
@@ -13,15 +19,19 @@ class MoleculeTopology:
     Handles molecule topology inference from file.
     Generalizes beyond Alanine Dipeptide.
     """
-    def __init__(self, file_path: str):
+    def __init__(self, file_path: str, topology_path: Optional[str] = None):
         self.file_path = Path(file_path)
         if not self.file_path.exists():
-            raise FileNotFoundError(f"Topology file not found: {file_path}")
+            raise FileNotFoundError(f"Structure/Topology file not found: {file_path}")
             
         try:
-            self.traj = md.load(str(file_path))
+            if topology_path:
+                self.traj = md.load(str(file_path), top=str(topology_path))
+            else:
+                self.traj = md.load(str(file_path))
         except Exception as e:
-            log.error(f"Failed to load topology from {file_path}: {e}")
+            # Fallback: if PDB has no bonds, mdtraj might not infer them automatically without standard residues.
+            log.error(f"Failed to load structure/topology: {e}")
             raise
 
         self.top = self.traj.topology
@@ -98,10 +108,76 @@ class MoleculeTopology:
                 dist = np.linalg.norm(xyz[a1] - xyz[a2])
                 
                 constraints.append([idx1, idx2, dist])
-                
+        
+        # --- Ring Constraints ---
+        # Detect rings and add internal constraints to enforce planarity/rigidity
+        rings = self._infer_rings()
+        n_ring_constraints = 0
+        xyz_all = self.traj.xyz[0]
+        
+        for ring_indices in rings:
+            # ring_indices are Global Atom Indices
+            # Filter for heavy atoms
+            ring_heavy = [mapping[idx] for idx in ring_indices if idx in mapping]
+            
+            if len(ring_heavy) < 3: 
+                continue # Need at least 3 atoms to triangulate
+            
+            # Add ALL pairwise constraints within the ring?
+            # Or just enough to rigidify? 
+            # All pairs is safest for planarity.
+            # Avoid duplicating existing bond constraints (check if pair exists?)
+            # Or just append and let duplicate constraints exist (solver handles it usually, or we filter)
+            
+            # Simple set for checking existing
+            existing_pairs = set()
+            for c in constraints:
+                p = tuple(sorted((int(c[0]), int(c[1]))))
+                existing_pairs.add(p)
+            
+            import itertools
+            for r1, r2 in itertools.combinations(ring_heavy, 2):
+                pair = tuple(sorted((r1, r2)))
+                if pair not in existing_pairs:
+                     # Get global indices to compute distance
+                     # r1 is heavy idx -> get global from self.heavy_indices[r1]
+                     g1 = heavy_indices[r1]
+                     g2 = heavy_indices[r2]
+                     
+                     dist = np.linalg.norm(xyz_all[g1] - xyz_all[g2])
+                     constraints.append([r1, r2, dist])
+                     existing_pairs.add(pair)
+                     n_ring_constraints += 1
+
         self._constraints = torch.tensor(constraints, dtype=torch.float32)
-        log.info(f"Inferred {len(constraints)} bond constraints for {self.n_heavy_atoms} heavy atoms.")
+        log.info(f"Inferred {len(constraints)} total constraints (Bonds: {len(constraints)-n_ring_constraints}, Ring-Rigidity: {n_ring_constraints}) for {self.n_heavy_atoms} heavy atoms.")
         return self._constraints
+
+    def _infer_rings(self) -> List[List[int]]:
+        """
+        Uses NetworkX to detect rings (cycles) in the molecular graph.
+        Returns list of lists of global atom indices.
+        """
+        if nx is None:
+            log.warning("NetworkX not installed. Skipping ring detection. Install networkx for better lignin constraints.")
+            return []
+            
+        # Build Graph
+        G = nx.Graph()
+        G.add_nodes_from(range(self.top.n_atoms))
+        edges = [(b.atom1.index, b.atom2.index) for b in self.top.bonds]
+        G.add_edges_from(edges)
+        
+        # Detect Cycles
+        # cycle_basis finds a fundamental basis. This usually captures the rings we care about (benzene etc).
+        cycles = nx.cycle_basis(G)
+        
+        # Filter relevant rings (e.g. 5 or 6 membered)
+        # Lignin/Benzene are 6. Furanose can be 5.
+        filtered_cycles = [c for c in cycles if 3 <= len(c) <= 8] # Broad range, but focuses on small structural rings
+        
+        log.info(f"Detected {len(filtered_cycles)} rings (size 3-8).")
+        return filtered_cycles
 
     def get_template_structure(self) -> torch.Tensor:
         """Returns the full template structure [Total_Atoms, 3]"""

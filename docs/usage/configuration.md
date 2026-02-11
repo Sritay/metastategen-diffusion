@@ -40,6 +40,11 @@ This section controls data loading.
 | `npz_path` | str | **Required** | Path to NPZ file containing positions. |
 | `pdb_path` | str | **Required** | Path to PDB file for toplogy inference. |
 | `scale_factor` | float | 1.0 | Global scaling factor for coordinates. |
+| `topology_path` | str | Optional | Path to topology file (PSF/GRO) if PDB lacks connectivity. |
+| `augment_low_data` | bool | true | Enable thermal augmentation if frames < min. |
+| `min_aug_frames` | int | 100 | Threshold to trigger augmentation. |
+| `aug_n_copies` | int | 1000 | Target size for augmented dataset. |
+| `aug_noise_scale` | float | 0.05 | Std-dev of Gaussian noise (Angstroms). |
 
 **Mode B: Pre-Split** (For AL Resuming or Manual Splits)
 | Parameter | Type | Default | Description |

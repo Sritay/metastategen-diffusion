@@ -2,7 +2,7 @@
 #SBATCH --job-name=ccpe-rocm-build
 #SBATCH --ntasks=8
 #SBATCH --time=00:50:00
-#SBATCH --account=<YOUR_BUDGET_CODE>
+#SBATCH --account=e760
 #SBATCH --partition=serial
 #SBATCH --qos=serial
 #SBATCH --export=none
@@ -12,10 +12,10 @@ set -euo pipefail
 export OMP_NUM_THREADS=1
 
 # from ARCHER2 user guide
-module use <SITE_SPECIFIC_MODULE_PATH>
+module use /work/y07/shared/archer2-lmod/others/dev
 module load ccpe/23.12/rocm/5.6.0
 
-cd <YOUR_PROJECT_ROOT>
+cd /work/e760/e760/sritay/3_metastategen-diffusion
 
 echo "Host: $(hostname)"
 echo "PWD:  $(pwd)"

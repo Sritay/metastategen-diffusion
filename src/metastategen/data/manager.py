@@ -111,6 +111,8 @@ def load_npz_as_al_data(npz_path: Path, pdb_path: Path, scale_factor: float = 1.
         elif n_atoms_data != n_heavy:
              log.warning(f"Mismatch: NPZ atoms {n_atoms_data} vs Inferred Heavy {n_heavy}. Assuming NPZ is already heavy-only or custom?")
              
+        _check_units(positions, atom_types)
+        
         out = {
             "positions": positions,
             "atom_types": atom_types
@@ -235,6 +237,39 @@ def _load_npz_energy_data(path: Path) -> dict[str, torch.Tensor]:
         "energies": torch.from_numpy(energies).float()
     }
 
+def _check_units(positions: torch.Tensor, atom_types: torch.Tensor, threshold_nm: float = 0.5) -> None:
+    """
+    Heuristic check for unit consistency (Angstrom vs nm).
+    MetaStateGen assumes nm (approx 0.15 nm bond length).
+    If average bond length is > 0.5, it's likely Angstroms (1.5 A).
+    """
+    # Quick heuristic: Sample first 100 frames
+    N = min(100, positions.shape[0])
+    if N == 0: return
+
+    # Calculate pairwise distances for first frame
+    pos = positions[0] # [N_atoms, 3]
+    if pos.shape[0] < 2: return # Only 1 atom
+    
+    # Calculate all pairwise distances
+    # We only care about bonded ones, but average nearest neighbor is a good proxy.
+    dists = torch.cdist(pos.unsqueeze(0), pos.unsqueeze(0))[0] # [N, N]
+    
+    # Mask diagonal
+    mask = torch.eye(pos.shape[0], device=pos.device).bool()
+    dists = dists.masked_fill(mask, float('inf'))
+    
+    # Get nearest neighbor for each atom
+    min_dists, _ = dists.min(dim=1)
+    avg_nn = min_dists.mean().item()
+    
+    log.info(f"Unit Check: Avg NN distance = {avg_nn:.4f} (Raw input units)")
+    
+    if avg_nn > threshold_nm:
+        log.warning(f"Suspected Angstrom units! Avg NN dist {avg_nn:.2f} > {threshold_nm}. "
+                    f"Model expects nm (approx 0.15). Please check 'scale_factor' or convert input.")
+
+
 def _load_pt_directory(path: Path) -> dict[str, torch.Tensor]:
     # Try to find specific filenames
     # Common convention from this project: forces.pt, energies.pt, positions.pt
@@ -260,4 +295,5 @@ def _load_pt_directory(path: Path) -> dict[str, torch.Tensor]:
         "forces": torch.load(forces_path),
         "energies": torch.load(energies_path)
     }
+
 

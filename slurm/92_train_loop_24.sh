@@ -2,7 +2,7 @@
 #SBATCH --partition=gpu
 #SBATCH --gpus=1
 #SBATCH --qos=gpu-shd
-#SBATCH --account=<YOUR_BUDGET_CODE>
+#SBATCH --account=e760
 #SBATCH --job-name=msgen-al-24
 #SBATCH --time=12:00:00
 #SBATCH --output=slurm-92-%j.out
@@ -10,11 +10,11 @@
 
 set -euo pipefail
 
-module use <SITE_SPECIFIC_MODULE_PATH>
+module use /work/y07/shared/archer2-lmod/others/dev
 module load ccpe/23.12/rocm/5.6.0
 module load cray-python
 
-cd <YOUR_PROJECT_ROOT>
+cd /work/e760/e760/sritay/3_metastategen-diffusion
 
 build_bind_list () {
   local raw="$1"

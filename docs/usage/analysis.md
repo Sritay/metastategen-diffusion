@@ -7,6 +7,10 @@ nav_order: 4
 
 # Analysis & Visualization
 
+[< Back: Training](training.md) | [Next: Configuration >](configuration.md)
+
+---
+
 We provide a suite of scripts in `scripts/analysis/` to verify the active learning and refinement results.
 
 ## 1. AL Density Evolution
@@ -41,3 +45,7 @@ python scripts/analysis/viz_funnel.py \
 ```
 *Note: Replace `<refinement_experiment_name>` with your sampling output directory (e.g., `tiny_sample_test`).*
 *Outputs: `funnel_plot.png` (Initial vs Refined overlay).*
+
+---
+
+[< Back: Training](training.md) | [Next: Configuration >](configuration.md)

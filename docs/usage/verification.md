@@ -7,6 +7,10 @@ nav_order: 2
 
 # Verification (Small Runs)
 
+[< Back: Installation](installation.md) | [Next: Inference >](inference.md)
+
+---
+
 To quickly verify that your installation is working correctly without waiting for full training loops, you can use these "tiny" configurations.
 
 ## 1. Tiny Training Run
@@ -39,3 +43,7 @@ msgen sample \
     --batch-size 10
 ```
 *Note: This command requires the checkpoint from Step 2.*
+
+---
+
+[< Back: Installation](installation.md) | [Next: Inference >](inference.md)

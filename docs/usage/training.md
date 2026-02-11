@@ -57,6 +57,26 @@ diffusion:
   beta_end: 0.02
 ```
 
+```
+
+### Low Data Training
+For systems with very limited data (e.g., a single PDB frame of a lignin polymer), MetaStateGen can automatically augment the data with thermal noise and rotations.
+
+```yaml
+data:
+  # Single frame input
+  npz_path: data/lignin/L0.npz
+  pdb_path: data/lignin/L0.pdb
+  # Optional: Separate topology file (if PDB lacks bonds)
+  topology_path: data/lignin/L0.psf
+  
+  # Augmentation Controls
+  augment_low_data: true
+  min_aug_frames: 100
+  aug_n_copies: 1000      # Replicate 1 frame -> 1000 frames
+  aug_noise_scale: 0.05   # Add 0.05 Angstrom thermal jitter
+```
+
 ---
 
 ## 2. Active Learning Loop

@@ -1,14 +1,10 @@
 from __future__ import annotations
 
-import argparse
-import sys
+from pathlib import Path
 import yaml
 import torch
-import torch.nn as nn
-from pathlib import Path
-import pandas as pd
-import time
-from typing import Optional
+from rich.logging import RichHandler
+import logging
 
 from metastategen.utils import get_logger, set_deterministic
 from metastategen.models.ensemble import build_diffusion_from_cfg, build_model_from_cfg
@@ -71,22 +67,48 @@ def run_training(config_path: str) -> int:
         # If user wants a split, they should pre-split or we add a 'val_split' arg?
         # AL loop auto-splits. Here let's just train on provided data.
         
+        # --- Augmentation for Low Data ---
+        augment_low_data = bool(data_cfg.get("augment_low_data", True))
+        min_frames = int(data_cfg.get("min_aug_frames", 100)) # If fewer frames than this, augment.
+        
+        # Or explicit 'n_copies' control
+        n_copies = int(data_cfg.get("aug_n_copies", 1000))
+        noise_scale = float(data_cfg.get("aug_noise_scale", 0.05))
+        
+        n_frames = raw_data["positions"].shape[0]
+        
+        if augment_low_data and n_frames < min_frames:
+            log.info(f"Low data detected ({n_frames} < {min_frames}). Applying Thermal Augmentation.")
+            from metastategen.data.augmentation import augment_with_noise_and_rotations
+            raw_data = augment_with_noise_and_rotations(
+                raw_data, 
+                n_copies=n_copies, 
+                noise_scale=noise_scale
+            )
+            log.info(f"Data augmented to {raw_data['positions'].shape[0]} frames.")
+        
         # ALDataManager wrappers are useful for scale handling, so we reuse it?
         # Yes, ALDataManager handles scaling and "PositionsDataset" creation.
         manager = ALDataManager(raw_data, scale_factor=scale_factor)
         
         # Infer topology for n_atom_types and constraints
-        topo_path = data_cfg.get("topo_path", pdb_path)
-        topology = MoleculeTopology(topo_path)
+        top_file = data_cfg.get("topology_extension", None) # Or just 'topology_path' distinct from 'pdb_path'?
+        # Let's standardize on: 'pdb_path' is main structure/coords. 'topology_path' is optional extra.
+        topology_path_arg = data_cfg.get("topology_path")
+        
+        # If user provided 'topo_path' in old config, it might mean the PDB itself?
+        # Let's clean this up.
+        
+        topology = MoleculeTopology(pdb_path, topology_path=topology_path_arg)
         chirality_config = topology.infer_chirality_config()
-        # Constraints are currently used in sampling, but maybe not in training loss (except implicitly via data)?
-        # Chirality features ARE used in training if model.cfg.use_chiral_features is True.
+        # Explicitly infer constraints to log them (and check rings)
+        constraints = topology.infer_constraints()
         
         n_atom_types = int(raw_data["atom_types"].max().item()) + 1
         
     else:
         # Fallback? No, require updated config for generalized training.
-         raise ValueError("Missing data config. Provide 'npz_path' & 'pdb_path' (Generalized). Legacy Ala2Dataset support has been removed.")
+        raise ValueError("Missing data config. Provide 'npz_path' & 'pdb_path' (Generalized). Legacy Ala2Dataset support has been removed.")
 
     # --- Model ---
     model = build_model_from_cfg(cfg, n_atom_types=n_atom_types).to(device)

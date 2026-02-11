@@ -21,6 +21,7 @@ dependencies = [
   "mdshare",
   "pandas",
   "wandb",
+  "networkx",
 ]
 
 [project.scripts]

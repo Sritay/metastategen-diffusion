@@ -36,10 +36,11 @@ msgen sample \
 | Argument | Default | Description |
 | :--- | :--- | :--- |
 | `--diff-ckpt` | Required | Path to the trained Diffusion Model checkpoint (`.pt`). |
-| `--force-ckpt` | Required | Path to the trained Pairwise Energy Model checkpoint (`.pt`). |
+| `--force-ckpt` | Optional | Path to the trained Pairwise Energy Model (Required if mode=`mlip`). |
+| `--refinement-mode` | `mlip` | Refinement Strategy: `mlip` (Force Field) or `geometric` (Clash Removal only). |
 | `--n-samples` | 100 | Number of structures to generate. |
 | `--batch-size` | 100 | Batch size for inference (adjust based on GPU memory). |
-| `--refinement-steps` | 2000 | Number of gradient descent steps for energy minimization. Use `50000` for high-quality refinement. |
+| `--refinement-steps` | 2000 | Number of gradient descent steps. |
 | `--keep-percent` | 1.0 | Fraction of lowest-energy samples to keep (e.g., `0.01` keeps top 1%). |
 | `--output-formats` | `['pdb', 'lammps_data']` | List of formats to save: `pdb`, `gro`, `xyz`, `lammps_dump`, `lammps_data`. |
 
