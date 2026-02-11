@@ -73,7 +73,7 @@ Molecular Dynamics (MD) simulations are computationally expensive, particularly 
 2.  **Active Learning**: An iterative acquisition strategy uses ensemble uncertainty to guide the model towards unexplored regions of the energy landscape, efficiently effectively covering metastable basins.
 3.  **Refinement**: A physics-based **Pairwise Energy Surrogate** relaxes the generated backbones via Langevin dynamics to specific local minima, ensuring physical validity and correct geometry.
 4.  **Generalization (v0.2.x)**: The pipeline supports **arbitrary molecules** (peptides, polymers like lignin) via automated topology inference. 
-5.  **Low Data Support**: Capable of training generative models from **single experimental frames** using thermal augmentation and physics-based ring constraints (e.g., maintaining benzene planarity in lignin).
+5.  **Low Data Support**: Capable of training generative models from **single molecule frames** (e.g., valid PDB structures) using thermal augmentation and physics-based ring constraints (e.g., maintaining benzene planarity in lignin).
 
 ### Future Directions
 *   **Oracle Expansion**: Integration with AIMD/CP2K for ground truth energy evaluation on larger systems.
