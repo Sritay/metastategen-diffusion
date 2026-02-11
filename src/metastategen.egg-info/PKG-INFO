@@ -1,4 +1,4 @@
-Metadata-Version: 2.1
+Metadata-Version: 2.4
 Name: metastategen
 Version: 0.1.0
 Summary: Metastable state generation with equivariant diffusion (Day-1: data + eval pipeline).
@@ -17,6 +17,7 @@ Requires-Dist: rich
 Requires-Dist: mdshare
 Requires-Dist: pandas
 Requires-Dist: wandb
+Dynamic: license-file
 
 # MetaStateGen-Diffusion
 
@@ -42,25 +43,11 @@ We combine **Geometric Deep Learning (EGNN)** for capturing molecular symmetries
 2.  **Loop B (Refinement):** Uses a pairwise force surrogate (trained on TimeWarp data) to refine generated structures via Langevin dynamics, ensuring physical plausibility.
 
 ## Installation
-
-1.  **Environment Setup:**
-    ```bash
-    python -m venv .venv
-    source .venv/bin/activate
-    pip install -r requirements.txt
-    pip install -e .
-    ```
-
-    *Note: For ROCm AMD GPU support, please see `slurm/pip-install.sh` or install PyTorch with the appropriate `--index-url`.*
-
-2.  **Data:**
-    Data is expected in `data/` directory.
-    - `mdshare` data: `data/processed/ala2/`
-    - `timewarp` data: `data/timewarp/`
+Please refer to the **[Installation Guide](https://sritay.github.io/metastategen-diffusion/usage/installation.html)** on our documentation website for detailed setup instructions, including environment creation and data preparation.
 
 ## Usage
 
-Please refer to the **[Usage Guide](https://sritay.github.io/metastategen-diffusion/usage.html)** on our documentation website for detailed installation, training, and sampling instructions.
+Please refer to the **[Usage Guide](https://sritay.github.io/metastategen-diffusion/usage.html)** on our documentation website for detailed training and sampling instructions.
 
 ## Structure
 
