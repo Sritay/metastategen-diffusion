@@ -38,6 +38,7 @@ class MoleculeTopology:
         self._heavy_indices = None
         self._constraints = None
         self._atom_types = None
+        self._rings = None
         
         log.info(f"Loaded topology for {self.file_path.name}. Atoms: {self.top.n_atoms}, Residues: {self.top.n_residues}")
 
@@ -60,6 +61,13 @@ class MoleculeTopology:
     def n_heavy_atoms(self) -> int:
         """Number of heavy atoms."""
         return len(self.heavy_indices)
+
+    @property
+    def rings(self) -> List[List[int]]:
+        """Returns list of rings (lists of global atom indices)."""
+        if self._rings is None:
+            self._rings = self._infer_rings()
+        return self._rings
 
     def get_atom_types(self) -> torch.Tensor:
         """

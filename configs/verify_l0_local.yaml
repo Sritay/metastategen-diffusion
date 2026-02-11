@@ -1,0 +1,35 @@
+train:
+  seed: 42
+  out_dir: runs/verify_l0_geo
+  epochs: 10
+  save_every: 2 # Save 5 checkpoints
+  lr: 3e-4
+  rot_aug: true
+
+data:
+  npz_path: data/miscanthus/L0.npz
+  pdb_path: data/miscanthus/L0.pdb
+  topology_path: data/miscanthus/L0.psf
+  scale_factor: 1.0 # Assuming NPZ is nm
+  batch_size: 4 # Small batch for single molecule
+  augment_low_data: true
+  min_aug_frames: 100
+  aug_n_copies: 100 # Augment to 100 samples
+  aug_noise_scale: 0.05
+
+model:
+  type: egnn
+  n_atom_types: auto # 4 types usually? C,H,O,N? Lignin has C, H, O.
+  n_layers: 3
+  hidden_dim: 64
+  time_emb_dim: 32
+  use_chiral_features: false # No chirality in planar rings usually? Or maybe yes. Leave false for speed.
+  use_rbf: true
+  rbf_cutoff: 0.5 # nm
+
+diffusion:
+  T: 100 # Fast diffusion
+  beta_start: 1e-4
+  beta_end: 0.02
+  schedule: cosine
+  recenter_every_step: true
