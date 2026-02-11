@@ -104,7 +104,7 @@ def run_training(config_path: str) -> int:
         "chirality_config": chirality_config
     }
     
-    training_dataset = manager.dataset() if manager else dataset
+    training_dataset = manager.dataset()
     
     batch_size = int(data_cfg.get("batch_size", 256))
     num_workers = int(data_cfg.get("num_workers", 0))
