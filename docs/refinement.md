@@ -11,9 +11,9 @@ math: mathjax
 
 **Primary Script**: [`scripts/sample_refined.py`](../scripts/sample_refined.py)
 
-The Refinement Loop converts the coarse, generated backbones into physically valid, generic low-energy states using a learned Pairwise Force Field.
+The Refinement Loop converts the coarse, generated backbones into physically valid, generic low-energy states.
 
-### Step 1: Template Alignment & Reconstruction
+### Step 1: Template Alignment & Reconstruction (Common)
 *   **Function**: `align_and_reconstruct` (from `metastategen.reconstruct`)
 *   **Input**: Backbone atoms from Diffusion ($X_{gen}$).
 *   **Algorithm**: Kabsch Algorithm.
@@ -21,23 +21,35 @@ The Refinement Loop converts the coarse, generated backbones into physically val
     2.  We extract its backbone atoms (identified via `mdtraj`).
     3.  We compute the optimal Rotation $R$ and Translation $T$ to align the template backbone to $X_{gen}$.
     4.  We apply $(R, T)$ to the **full** template.
-    5.  **Critical Step**: We overwrite the backbone positions with $X_{gen}$ to preserve the diffusion model's generated conformation, while keeping side-chains attached rigidly.
+    5.  **Critical Step**: We overwrite the backbone positions with $X_{gen}$ to preserve the diffusion model's generated conformation, while keeping side-chains attached rigidly to the aligned frame.
 
-### Step 2: Warm-up Phase (Geometric Correction)
-*   **Goal**: The rigid reconstruction creates "Frankenstein" molecules where side-chains might clash sterically or bonds might be slightly stretched.
-*   **Process**: 1000 steps of gradient descent using the **Pairwise Force Model**.
-*   **Bond Constraints**:
-    *   **Function**: `constrain_bonds_22`
-    *   **Logic**: The force model is soft. To prevent atoms from drifting into vacuum or collapsing, we explicitly project the N-CA and CA-C bonds to fixed physical lengths (1.46Å, 1.51Å) after every gradient step. This is a "Shake"-like algorithm implemented via iterative coordinate correction.
+### Step 2: Refinement Strategy (Choose One)
 
-### Step 3: Energy Filtering
-*   **Model**: `PairwiseEnergyModel`
-*   **Logic**: We predict the potential energy $E(x)$ of all warmed-up candidates.
-*   **Selection**: We keep only the top $1\%$ of structures (lowest Energy). This filters out kinetically trapped states or geometric disasters that the warm-up could not fix.
+The pipeline supports two modes for relaxing the initial "Frankenstein" structures.
 
-### Step 4: Main Refinement (Relaxation)
-*   **Process**: The surviving candidates undergo a deep relaxation (50,000 steps).
-*   **Physics**: This mimics an energy minimization or low-temperature molecular dynamics simulation. The structure slides down the Potential Energy Surface (PES) predicted by the surrogate model into the nearest local metastable basin.
+#### Option A: MLIP Refinement (Default)
+**Flag**: `--refinement-mode mlip`
+
+High-fidelity relaxation using a learned **Pairwise Force Field**. This is the standard mode for generating valid physical ensembles.
+
+1.  **Warm-up (Geometric Correction)**:
+    *   1000 steps of gradient descent to untangle severe clashes.
+    *   **Bond Constraints**: Project bonds to fixed physical lengths after every step to prevent collapse.
+2.  **Energy Filtering**:
+    *   Predict potential energy $E(x)$ of all candidates.
+    *   Keep only the top e.g. $1-10\%$ (lowest Energy) to filter out kinetic traps.
+3.  **Main Relaxation**:
+    *   Deep relaxation (e.g., 2000+ steps) via Langevin dynamics using the surrogate model.
+    *   Structures slide into the nearest local metastable basin.
+
+#### Option B: Geometric Refinement (Lite)
+**Flag**: `--refinement-mode geometric`
+
+Fast, model-free clash removal. Useful for quick visualization or when no force field is available.
+
+*   **Algorithm**: Applies a soft repulsive potential for overlapping atoms ($V = k(r_{cut} - r)^2$ if $r < r_{cut}$).
+*   **Constraints**: Maintains bond lengths via projection but does not optimize energy.
+*   **Result**: Geometrically plausible structures without physical energy guarantees.
 
 ### Results
 ![Refinement Funnel](assets/funnel_plot_23.png)

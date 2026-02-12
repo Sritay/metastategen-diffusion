@@ -61,6 +61,14 @@ We combine **Geometric Deep Learning (EGNN)** for capturing molecular symmetries
 *   **Refinement Loop**: Internals of `sample_refined` and reconstruction algorithms.
 *   **Analysis Pipeline**: Implementation details for `viz_density`, `viz_funnel`, and cluster analysis.
 
+## Key Features
+
+*   **Geometric Deep Learning**: Uses E(3)-equivariant Graph Neural Networks (EGNN) to learn 3D molecular distributions.
+*   **Active Learning**: Iteratively explores the energy landscape using ensemble uncertainty to discover new metastable states.
+*   **Arbitrary Molecule Support**: Automated topology inference for peptides, polymers (e.g., Lignin), and small molecules.
+*   **Ring Constraints**: Explicitly enforces planarity and rigidity for cyclic systems (e.g., benzene) during generation.
+*   **Low Data Regime**: Capable of training from sparse data (even single structures) using physics-based thermal augmentation.
+
 ---
 
 ## Introduction
@@ -72,8 +80,8 @@ Molecular Dynamics (MD) simulations are computationally expensive, particularly 
 1.  **EGNN-based Denoising Diffusion**: An E(3)-equivariant Graph Neural Network (EGNN) learns to reverse a diffusion process, approximating the **underlying conformational distribution** of the heavy-atom backbone.
 2.  **Active Learning**: An iterative acquisition strategy uses ensemble uncertainty to guide the model towards unexplored regions of the energy landscape, efficiently effectively covering metastable basins.
 3.  **Refinement**: A physics-based **Pairwise Energy Surrogate** relaxes the generated backbones via Langevin dynamics to specific local minima, ensuring physical validity and correct geometry.
-4.  **Generalization (v0.2.x)**: The pipeline supports **arbitrary molecules** (peptides, polymers like lignin) via automated topology inference. 
-5.  **Low Data Support**: Capable of training generative models from **single molecule frames** (e.g., valid PDB structures) using thermal augmentation and physics-based ring constraints (e.g., maintaining benzene planarity in lignin).
+4.  **Refinement**: Post-processing to ensure physical validity and correct geometry (see [Refinement](refinement.md)).
+5.  **Generalization**: Support for arbitrary topologies via graph-based inference.
 
 ### Future Directions
 *   **Oracle Expansion**: Integration with AIMD/CP2K for ground truth energy evaluation on larger systems.
