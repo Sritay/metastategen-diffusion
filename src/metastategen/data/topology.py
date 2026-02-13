@@ -156,9 +156,41 @@ class MoleculeTopology:
                      constraints.append([r1, r2, dist])
                      existing_pairs.add(pair)
                      n_ring_constraints += 1
+        # --- 1-3 Angle Constraints (Heavy Atoms) ---
+        # Constrain pairs of heavy atoms that are 2 bonds apart.
+        # This captures inter-ring linkages (e.g., C-O-C glycosidic bonds)
+        # that ring-rigidity constraints don't cover.
+        existing_pairs = set()
+        for c in constraints:
+            p = tuple(sorted((int(c[0]), int(c[1]))))
+            existing_pairs.add(p)
+        
+        # Build heavy-atom adjacency in local index space
+        heavy_adj = {i: set() for i in range(len(heavy_indices))}
+        for bond in self.top.bonds:
+            a1, a2 = bond.atom1.index, bond.atom2.index
+            if a1 in mapping and a2 in mapping:
+                heavy_adj[mapping[a1]].add(mapping[a2])
+                heavy_adj[mapping[a2]].add(mapping[a1])
+        
+        n_angle_constraints = 0
+        for i in range(len(heavy_indices)):
+            for j in heavy_adj[i]:
+                for k in heavy_adj[j]:
+                    if k != i:
+                        pair = tuple(sorted((i, k)))
+                        if pair not in existing_pairs:
+                            g1 = heavy_indices[i]
+                            g2 = heavy_indices[k]
+                            dist = np.linalg.norm(xyz_all[g1] - xyz_all[g2])
+                            constraints.append([i, k, dist])
+                            existing_pairs.add(pair)
+                            n_angle_constraints += 1
 
         self._constraints = torch.tensor(constraints, dtype=torch.float32)
-        log.info(f"Inferred {len(constraints)} total constraints (Bonds: {len(constraints)-n_ring_constraints}, Ring-Rigidity: {n_ring_constraints}) for {self.n_heavy_atoms} heavy atoms.")
+        total_ring = n_ring_constraints
+        total_bond = len(constraints) - n_ring_constraints - n_angle_constraints
+        log.info(f"Inferred {len(constraints)} total constraints (Bonds: {total_bond}, Ring-Rigidity: {total_ring}, Angle-1-3: {n_angle_constraints}) for {self.n_heavy_atoms} heavy atoms.")
         return self._constraints
 
     def _infer_rings(self) -> List[List[int]]:

@@ -112,6 +112,48 @@ def save_lammps_data(
             
     log.info(f"Saved LAMMPS data to {out_path}")
 
+def _append_conect_records(pdb_path: str, topology: md.Topology):
+    """
+    Append CONECT records to a PDB file based on the topology's bond graph.
+    Inserts CONECT records before each END line (for multi-model PDB files).
+    This ensures VMD/PyMOL draw correct bonds instead of inferring from distance.
+    """
+    # Build adjacency list (1-indexed for PDB CONECT format)
+    from collections import defaultdict
+    adj = defaultdict(list)
+    for bond in topology.bonds:
+        a1 = bond.atom1.index + 1  # PDB is 1-indexed
+        a2 = bond.atom2.index + 1
+        adj[a1].append(a2)
+        adj[a2].append(a1)
+    
+    # Generate CONECT lines
+    conect_lines = []
+    for atom_idx in sorted(adj.keys()):
+        partners = sorted(adj[atom_idx])
+        # PDB CONECT format: up to 4 partners per line
+        for i in range(0, len(partners), 4):
+            chunk = partners[i:i+4]
+            line = f"CONECT{atom_idx:5d}" + "".join(f"{p:5d}" for p in chunk)
+            conect_lines.append(line)
+    
+    if not conect_lines:
+        return
+    
+    # Read existing PDB, insert CONECT before each END
+    with open(pdb_path, 'r') as f:
+        lines = f.readlines()
+    
+    new_lines = []
+    conect_block = "\n".join(conect_lines) + "\n"
+    for line in lines:
+        if line.strip() == "END":
+            new_lines.append(conect_block)
+        new_lines.append(line)
+    
+    with open(pdb_path, 'w') as f:
+        f.writelines(new_lines)
+
 def save_outputs(
     positions: torch.Tensor,
     out_dir: Union[str, Path],
@@ -155,6 +197,8 @@ def save_outputs(
         if fmt == 'pdb':
             out_path = out_dir / f"{prefix}.pdb"
             traj.save_pdb(str(out_path))
+            # Append CONECT records for proper bonding in VMD
+            _append_conect_records(str(out_path), top)
             log.info(f"Saved {out_path}")
             
         elif fmt == 'gro':
