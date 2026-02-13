@@ -29,7 +29,7 @@ The Refinement Loop converts the coarse, generated backbones into physically val
 
 The pipeline supports two modes for relaxing the initial "Frankenstein" structures.
 
-#### Option A: MLIP Refinement (Default)
+### Option A: MLIP Refinement (Default)
 **Flag**: `--refinement-mode mlip`
 
 High-fidelity relaxation using a learned **Pairwise Force Field**. This is the standard mode for generating valid physical ensembles.
@@ -44,7 +44,7 @@ High-fidelity relaxation using a learned **Pairwise Force Field**. This is the s
     *   Deep relaxation (e.g., 2000+ steps) via Langevin dynamics using the surrogate model.
     *   Structures slide into the nearest local metastable basin.
 
-#### Option B: Geometric Refinement (Lite)
+### Option B: Geometric Refinement (Lite)
 **Flag**: `--refinement-mode geometric`
 
 Fast, model-free clash removal. Useful for quick visualization or when no force field is available.

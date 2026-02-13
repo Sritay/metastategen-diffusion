@@ -30,6 +30,22 @@ We combine **Geometric Deep Learning (EGNN)** for capturing molecular symmetries
 
 ---
 
+## Introduction
+
+### Motivation
+Molecular Dynamics (MD) simulations are computationally expensive, particularly for sampling rare events and metastable states. This project addresses the challenge of exploring diverse, low-energy conformational basins without the prohibitive cost of long-timescale simulations.
+
+### Methodology
+1.  **EGNN-based Denoising Diffusion**: An E(3)-equivariant Graph Neural Network (EGNN) learns to reverse a diffusion process, approximating the **underlying conformational distribution** of the heavy-atom backbone.
+2.  **Active Learning**: An iterative acquisition strategy uses ensemble uncertainty to guide the model towards unexplored regions of the energy landscape, efficiently covering metastable basins.
+3.  **Refinement**: A physics-based **Pairwise Energy Surrogate** relaxes the generated backbones via Langevin dynamics to specific local minima, ensuring physical validity and correct geometry.
+4.  **Generalization**: Support for arbitrary topologies via graph-based inference.
+
+### Future Directions
+*   **Oracle Expansion**: Integration with AIMD/CP2K for ground truth energy evaluation on larger systems.
+
+---
+
 ## 📚 Documentation Contents
 
 ### [1. Active Learning Loop](active_learning.md)
@@ -70,23 +86,6 @@ We combine **Geometric Deep Learning (EGNN)** for capturing molecular symmetries
 *   **Ring Constraints**: Explicitly enforces planarity and rigidity for cyclic systems (e.g., benzene) during generation.
 *   **Low Data Regime**: Capable of training from sparse data (even single structures) using physics-based thermal augmentation.
 
----
 
-## Introduction
-
-### Motivation
-Molecular Dynamics (MD) simulations are computationally expensive, particularly for sampling rare events and metastable states. This project addresses the challenge of exploring diverse, low-energy conformational basins without the prohibitive cost of long-timescale simulations.
-
-### Methodology
-1.  **EGNN-based Denoising Diffusion**: An E(3)-equivariant Graph Neural Network (EGNN) learns to reverse a diffusion process, approximating the **underlying conformational distribution** of the heavy-atom backbone.
-2.  **Active Learning**: An iterative acquisition strategy uses ensemble uncertainty to guide the model towards unexplored regions of the energy landscape, efficiently effectively covering metastable basins.
-3.  **Refinement**: A physics-based **Pairwise Energy Surrogate** relaxes the generated backbones via Langevin dynamics to specific local minima, ensuring physical validity and correct geometry.
-4.  **Refinement**: Post-processing to ensure physical validity and correct geometry (see [Refinement](refinement.md)).
-5.  **Generalization**: Support for arbitrary topologies via graph-based inference.
-
-### Future Directions
-*   **Oracle Expansion**: Integration with AIMD/CP2K for ground truth energy evaluation on larger systems.
-
----
 
 [Next: Active Learning >](active_learning.md)
