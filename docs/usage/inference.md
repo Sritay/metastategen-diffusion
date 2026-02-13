@@ -22,13 +22,30 @@ The `msgen sample` command runs the full generation pipeline:
 
 ### Basic Usage
 
+#### 1. MLIP Refinement (Force Field)
+Standard mode for proteins/peptides using a trained potential.
+
 ```bash
 msgen sample \
     --diff-ckpt pretrained_models/diffusion_model.pt \
     --force-ckpt pretrained_models/force_field.pt \
-    --out-dir runs/test_sampling \
+    --out-dir runs/test_mlip \
     --n-samples 100 \
     --refinement-steps 2000
+```
+
+#### 2. Geometric Refinement (Lignin/Topology)
+Physics-free mode using topological constraints. Ideal for Lignin.
+See [Lignin Generation Example](lignin_generation.md) for details.
+
+```bash
+msgen sample \
+    --diff-ckpt pretrained_models/diffusion_model.pt \
+    --topology data/miscanthus/L0.pdb \
+    --connectivity data/miscanthus/L0.psf \
+    --out-dir runs/test_geometric \
+    --refinement-mode geometric \
+    --n-samples 100
 ```
 
 ### Key Arguments
@@ -37,8 +54,7 @@ msgen sample \
 | :--- | :--- | :--- |
 | `--diff-ckpt` | Required | Path to the trained Diffusion Model checkpoint (`.pt`). |
 | `--force-ckpt` | Optional | Path to the trained Pairwise Energy Model (Required if mode=`mlip`). |
-| `--refinement-mode` | `mlip` | Refinement Strategy: `mlip` (Force Field) or `geometric` (Clash Removal only). |
-| `--connectivity` | Optional | Path to PSF/GRO file. Essential for non-standard molecules (e.g. Lignin) to correctly infer bonds/rings. |
+| `--refinement-mode` | `mlip` | Refinement Strategy: `mlip` (Force Field, energy optimization) or `geometric` (Clash Removal, topology constraints). |
 | `--n-samples` | 100 | Number of structures to generate. |
 | `--batch-size` | 100 | Batch size for inference (adjust based on GPU memory). |
 | `--refinement-steps` | 2000 | Number of gradient descent steps. |

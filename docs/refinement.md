@@ -16,7 +16,9 @@ The Refinement Loop converts the coarse, generated backbones into physically val
 ### Step 1: Template Alignment & Reconstruction (Common)
 *   **Function**: `align_and_reconstruct` (from `metastategen.reconstruct`)
 *   **Input**: Backbone atoms from Diffusion ($X_{gen}$).
-*   **Algorithm**: Kabsch Algorithm.
+*   **Algorithm**: 
+    1.  **Global Alignment (Rigid)**: Uses Kabsch Algorithm for proteins/peptides.
+    2.  **Local Frame Reconstruction (Flexible)**: Uses neighbor-based coordinate frames for flexible chains (e.g. Lignin). Includes **robust degeneracy handling** to prevent atom collapse on distorted backbones.
     1.  We take a reference template structure (specified via `--topology`).
     2.  We extract its backbone atoms (identified via `mdtraj`).
     3.  We compute the optimal Rotation $R$ and Translation $T$ to align the template backbone to $X_{gen}$.
@@ -48,8 +50,11 @@ High-fidelity relaxation using a learned **Pairwise Force Field**. This is the s
 Fast, model-free clash removal. Useful for quick visualization or when no force field is available.
 
 *   **Algorithm**: Applies a soft repulsive potential for overlapping atoms ($V = k(r_{cut} - r)^2$ if $r < r_{cut}$).
-*   **Constraints**: Maintains bond lengths via projection but does not optimize energy.
-*   **Result**: Geometrically plausible structures without physical energy guarantees.
+*   **Topology Constraints**: Automatically inferred from connectivity (PSF/GRO):
+    *   **Ring Rigidity**: Enforces planarity for 3-8 membered rings.
+    *   **Angle Constraints**: Maintains 1-3 heavy atom distances and Local Geometry (H-C-H angles).
+    *   **Geminal Protection**: Prevents H-H pairs on the same parent from collapsing.
+*   **Result**: Geometrically plausible structures with correct bond topology, suitable for visualization or further MD.
 
 ### Results
 ![Refinement Funnel](assets/funnel_plot_23.png)
