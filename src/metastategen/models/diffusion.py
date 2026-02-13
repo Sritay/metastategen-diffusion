@@ -188,19 +188,6 @@ class GaussianDiffusion(nn.Module):
         if cfg.schedule == "linear":
             betas = torch.linspace(cfg.beta_start, cfg.beta_end, cfg.T)
         elif cfg.schedule == "cosine":
-            # ... (rest of init is same, need to be careful not to delete)
-            # Actually this replace call is too big/risky to replace everything.
-            # I should split the edits.
-            pass
-
-
-
-        super().__init__()
-        self.cfg = cfg
-        
-        if cfg.schedule == "linear":
-            betas = torch.linspace(cfg.beta_start, cfg.beta_end, cfg.T)
-        elif cfg.schedule == "cosine":
             steps = cfg.T + 1
             s = 0.008
             t = torch.linspace(0, cfg.T, steps) / cfg.T

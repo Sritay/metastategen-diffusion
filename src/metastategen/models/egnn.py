@@ -159,7 +159,7 @@ class EGNNLayer(nn.Module):
         # Eq: x_i = x_i + sum (x_i - x_j) * weights
         delta = torch.sum(diff * coord_weights, dim=2) # Sum over j -> [B, N, 3]
         
-        # Clip delta for stability
+        # Clip delta for stability (Standard generous clamp)
         delta = torch.clamp(delta, -10.0, 10.0)
         x_new = x + delta
         

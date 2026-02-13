@@ -10,7 +10,7 @@ data:
   npz_path: data/miscanthus/L0.npz
   pdb_path: data/miscanthus/L0.pdb
   topology_path: data/miscanthus/L0.psf
-  scale_factor: 1.0 # Assuming NPZ is nm
+  scale_factor: 7.0 # Scales 0.15 nm -> 1.05 (Ideal for diffusion)
   batch_size: 4 # Small batch for single molecule
   augment_low_data: true
   min_aug_frames: 100

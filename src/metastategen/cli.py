@@ -65,7 +65,10 @@ def _cmd_sample(args: argparse.Namespace) -> int:
         warmup_steps=args.warmup_steps,
         keep_percent=args.keep_percent,
         output_formats=args.output_formats,
-        seed=args.seed
+        seed=args.seed,
+        topology_path=args.topology,
+        refinement_mode=args.refinement_mode,
+        connectivity_path=args.connectivity,
     )
 
 def _not_impl(_: argparse.Namespace, name: str) -> int:
@@ -109,6 +112,10 @@ def build_parser() -> argparse.ArgumentParser:
     ps.add_argument("--seed", type=int, default=42)
     ps.add_argument("--output-formats", nargs='+', default=['pdb', 'lammps_data'], 
                     help="List of output formats: pdb, gro, xyz, lammps_dump, lammps_data")
+    ps.add_argument("--topology", type=str, default=None, help="Path to topology file (PDB)")
+    ps.add_argument("--refinement-mode", type=str, default="mlip", choices=["mlip", "geometric"],
+                    help="Refinement type: 'mlip' (Force Field) or 'geometric' (Clash Removal)")
+    ps.add_argument("--connectivity", type=str, default=None, help="Path to PSF/GRO for bonds")
     ps.set_defaults(func=_cmd_sample)
 
     # al
