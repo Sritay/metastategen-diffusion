@@ -18,14 +18,25 @@ Welcome to the **MetaStateGen Diffusion** project documentation.
 
 ## Project Goal
 This project builds a Machine Learning model capable of predicting metastable states for molecular systems. 
-We currently focus on **Alanine Dipeptide** and **Lignin (L0)** as benchmarks for evaluating generative models of metastable dynamics in both rigid and flexible systems.
+We currently focus on **Alanine Dipeptide** and **Lignin** as benchmarks for evaluating generative models of metastable dynamics in both rigid and flexible systems.
 
 We combine **Geometric Deep Learning (EGNN)** for capturing molecular symmetries with **Active Learning** to iteratively explore and learn the conformational landscape efficiently.
 
 <div align="center">
-  <img src="assets/movie.gif" alt="Generated Structures" width="60%">
+  <div style="display: flex; justify-content: center; gap: 20px;">
+    <div style="text-align: center;">
+      <img src="assets/movie.gif" alt="Alanine Dipeptide" width="300">
+      <br>
+      <em>Alanine Dipeptide</em>
+    </div>
+    <div style="text-align: center;">
+      <img src="assets/lignin_diverse.gif" alt="Lignin Molecule" width="300">
+      <br>
+      <em>Lignin Molecule</em>
+    </div>
+  </div>
   <br>
-  <em><strong>Figure 1: Generation in Action.</strong> The diffusion model generates diverse 10-atom backbones which are then reconstructed and refined into full all-atom structures.</em>
+  <em><strong>Figure 1: Generation in Action.</strong> The diffusion model generates diverse structures for both rigid peptide backbones and flexible aromatic polymers, which are then reconstructed and refined into full all-atom structures.</em>
 </div>
 
 ---
