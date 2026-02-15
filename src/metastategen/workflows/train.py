@@ -8,7 +8,7 @@ import logging
 
 from metastategen.utils import get_logger, set_deterministic
 from metastategen.models.ensemble import build_diffusion_from_cfg, build_model_from_cfg
-from metastategen.data import load_npz_as_al_data, ALDataManager
+from metastategen.data import load_training_data, ALDataManager
 from metastategen.data.topology import MoleculeTopology
 from metastategen.workflows.common import (
     _resolve_run_root,
@@ -44,23 +44,19 @@ def run_training(config_path: str) -> int:
     log.info(f"Device: {device}")
 
     # --- Data Loading (Generalized) ---
-    # We use load_npz_as_al_data to support arbitrary NPZ + PDB inputs
-    # Just like AL loop, but we won't do splitting, we just load 'train' data.
-    # 
-    # If users provide explicit paths in data_cfg, we use them.
-    # If they use the old 'data_dir' + 'train_trajs' style (Ala2Dataset), we might need to support that?
-    #
-    # Proposal: Support BOTH for backward compatibility, or switch to Generalized?
-    # The user request implies "make AL optional", suggesting we want the SAME capabilities as AL (generalized) but without the loop.
-    # So we should prioritize the Generalized Loader.
+    # We use load_training_data to support arbitrary inputs (NPZ, LAMMPS, PDB-only)
     
-    npz_path = data_cfg.get("npz_path")
-    pdb_path = data_cfg.get("pdb_path")
+    # Support both old 'npz_path' and new 'traj_path' keys
+    traj_path = data_cfg.get("traj_path") or data_cfg.get("npz_path")
+    # Support both old 'pdb_path' and new 'topo_path' keys
+    topo_path = data_cfg.get("topo_path") or data_cfg.get("pdb_path")
     
-    if npz_path and pdb_path:
-        log.info(f"Loading generalized data from {npz_path} and {pdb_path}")
+    if topo_path:
+        log.info(f"Loading generalized data. Topo: {topo_path}, Traj: {traj_path}")
         scale_factor = float(data_cfg.get("scale_factor", 1.0))
-        raw_data = load_npz_as_al_data(Path(npz_path), Path(pdb_path))
+        
+        # Load Data using generalized loader
+        raw_data = load_training_data(traj_path=traj_path, topo_path=topo_path, scale_factor=scale_factor)
         
         # In a normal training script, we might want to split into Train/Val manually or assume provided data is Train.
         # For simplicity, let's treat the entire NPZ as training data.
@@ -99,7 +95,7 @@ def run_training(config_path: str) -> int:
         # If user provided 'topo_path' in old config, it might mean the PDB itself?
         # Let's clean this up.
         
-        topology = MoleculeTopology(pdb_path, topology_path=topology_path_arg)
+        topology = MoleculeTopology(topo_path, topology_path=topology_path_arg)
         chirality_config = topology.infer_chirality_config()
         # Explicitly infer constraints to log them (and check rings)
         constraints = topology.infer_constraints()

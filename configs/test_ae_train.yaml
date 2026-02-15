@@ -1,0 +1,32 @@
+train:
+  exp_name: test_ae_single_frame
+  out_dir: runs/test_ae
+  seed: 42
+  epochs: 1
+  lr: 1.0e-4
+  grad_clip: 1.0
+  batch_size: 1
+  save_every: 1
+  rot_aug: False
+
+data:
+  topo_path: data/timewarp/AE/AE-traj-state0.pdb
+  traj_path: data/timewarp/AE/AE-traj-arrays.npz # Use NPZ for coords
+  scale_factor: 1.0
+  num_workers: 0
+
+model:
+  n_layers: 2
+  hidden_dim: 32
+  time_emb_dim: 32
+  n_atom_types: 5 # C,N,O,S,Other
+
+diffusion:
+  T: 10
+  beta_start: 1.0e-4
+  beta_end: 0.02
+  schedule: linear
+  recenter_every_step: True
+  scale_factor: 1.0 # AE might not need 7.0 scaling like Lignin? Or safe to default? 
+  # Actually, let's stick to 1.0 for AE or just omit. 
+  # If Lignin needed 7.0, it was likely due to large size. AE is small.

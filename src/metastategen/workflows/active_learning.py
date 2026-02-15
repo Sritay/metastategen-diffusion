@@ -11,9 +11,9 @@ from typing import Union, Optional, Tuple, List
 
 from metastategen.active_learning import select_acquisition
 try:
-    from metastategen.data import ALDataManager, load_al_data, load_npz_as_al_data
+    from metastategen.data import ALDataManager, load_al_data, load_training_data
 except ImportError:  # Fallback
-    from metastategen.data.manager import ALDataManager, load_al_data, load_npz_as_al_data
+    from metastategen.data.manager import ALDataManager, load_al_data, load_training_data
 from metastategen.eval.coverage import kl_from_phi_psi
 from metastategen.eval.rmsd import greedy_cluster, rmsd_kabsch
 from metastategen.models.diffusion import center, constrain_bonds, constrain_chirality
@@ -385,14 +385,15 @@ def run_active_learning(config_path: str) -> int:
     if not (seed_path.exists() and pool_path.exists() and val_path.exists()):
         log.info("AL split files not found. Checking for raw inputs to auto-generate splits...")
         
-        npz_source = data_cfg.get("npz_path")
-        pdb_source = data_cfg.get("pdb_path") # Used for topology
+        traj_source = data_cfg.get("traj_path") or data_cfg.get("npz_path")
+        topo_source = data_cfg.get("topo_path") or data_cfg.get("pdb_path") # Used for topology
         
-        if npz_source and pdb_source and Path(npz_source).exists() and Path(pdb_source).exists():
-            log.info(f"Ingesting raw data from {npz_source} and {pdb_source}")
+        # We need at least a Topology source to proceed with generalized loading
+        if topo_source and Path(topo_source).exists():
+            log.info(f"Ingesting raw data. Topo: {topo_source}, Traj: {traj_source}")
             
             # Load full dataset
-            full_data = load_npz_as_al_data(Path(npz_source), Path(pdb_source))
+            full_data = load_training_data(traj_path=traj_source, topo_path=topo_source)
             n_total = full_data["positions"].shape[0]
             log.info(f"Loaded {n_total} frames. Splitting...")
             
@@ -401,8 +402,16 @@ def run_active_learning(config_path: str) -> int:
             n_val = int(al_cfg.get("val_size", 2000))
             n_pool = n_total - n_seed - n_val
             
-            if n_pool < 0:
-                raise ValueError(f"Dataset size {n_total} too small for requested seed={n_seed}, val={n_val}")
+            n_pool = n_total - n_seed - n_val
+            
+            # Low Data Check: AL is disabled if dataset is too small.
+            if n_pool <= 0:
+                 raise ValueError(
+                     f"Dataset size ({n_total}) is insufficient for Active Learning with "
+                     f"initial_seed_size={n_seed} and val_size={n_val}. "
+                     "Active Learning requires a non-empty pool. "
+                     "For small datasets, please use standard training ('msgen train')."
+                 )
                 
             # Sequential split for simplicity and trajectory coherence (Head=Seed, Tail=Val, Mid=Pool)
             # This mimics 'past' data (Seed) vs 'future' data (Val)

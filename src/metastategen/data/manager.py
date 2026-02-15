@@ -51,24 +51,35 @@ def load_al_data(path: Union[str, Path]) -> dict[str, torch.Tensor]:
     return data
 
 
-def load_npz_as_al_data(npz_path: Path, pdb_path: Path, scale_factor: float = 1.0) -> dict[str, torch.Tensor]:
+def load_training_data(traj_path: Optional[Union[str, Path]] = None, topo_path: Optional[Union[str, Path]] = None, scale_factor: float = 1.0) -> dict[str, torch.Tensor]:
     """
-    Loads data from a TimeWarp-style NPZ + PDB pair.
-    NPZ expected keys: 'positions' or 'coords' [N, val_atoms, 3].
-    PDB used for atom_types.
-    """
-    if not npz_path.exists():
-        raise FileNotFoundError(npz_path)
-    if not pdb_path.exists():
-        raise FileNotFoundError(pdb_path)
+    Generalized loader for training data (positions + atom types).
+    
+    Args:
+        traj_path: Path to trajectory file (.npz, .pdb, .lammpstrj, .gro, .xyz).
+                   If None, uses topo_path as trajectory (1 frame).
+        topo_path: Path to topology file (.pdb, .psf). 
+                   Required for atom types and constraints.
+        scale_factor: Scaling factor for positions (default 1.0).
         
-    # Load Topology for Atom Types
+    Returns:
+        Dict with 'positions' [N, Atoms, 3] and 'atom_types' [Atoms].
+    """
+    if topo_path is None:
+        raise ValueError("topo_path is required to define atom types/topology.")
+        
+    topo_path = Path(topo_path)
+    if not topo_path.exists():
+        raise FileNotFoundError(f"Topology file not found: {topo_path}")
+
+    # 1. Load Topology (Atom Types)
     try:
         import mdtraj as md
-        traj = md.load(str(pdb_path))
+        # Load topology structure
+        traj_top = md.load(str(topo_path))
         atom_types = []
-        # Simple mapping (Same as toplogy.py) - refactor later to share?
-        for atom in traj.topology.atoms:
+        # Simple mapping (Same as toplogy.py)
+        for atom in traj_top.topology.atoms:
             if atom.element.symbol == "H": continue
             s = atom.element.symbol
             if s == "C": atom_types.append(0)
@@ -78,49 +89,70 @@ def load_npz_as_al_data(npz_path: Path, pdb_path: Path, scale_factor: float = 1.
             else: atom_types.append(4)
             
         atom_types = torch.tensor(atom_types, dtype=torch.long)
+        heavy_indices = [a.index for a in traj_top.topology.atoms if a.element.symbol != "H"]
+        
     except Exception as e:
-        raise ValueError(f"Failed to infer atom types from PDB {pdb_path}: {e}")
+        raise ValueError(f"Failed to infer atom types from Topology {topo_path}: {e}")
 
-    # Load NPZ
-    try:
-        data = np.load(npz_path)
-        # Look for positions
-        if "positions" in data:
-            coords = data["positions"]
-        elif "coords" in data:
-            coords = data["coords"]
-        else:
-            raise KeyError(f"NPZ must contain 'positions' or 'coords'. Found: {list(data.keys())}")
+    # 2. Determine Trajectory Source
+    if traj_path is None:
+        log.info(f"No trajectory path provided. Using topology file {topo_path} as single-frame training data.")
+        traj_source = topo_path
+    else:
+        traj_source = Path(traj_path)
+        if not traj_source.exists():
+             raise FileNotFoundError(f"Trajectory file not found: {traj_source}")
+
+    # 3. Load Coordinates
+    positions = None
+    
+    if traj_source.suffix == ".npz":
+        # Fast path for NPZ
+        try:
+            data = np.load(traj_source)
+            if "positions" in data:
+                coords = data["positions"]
+            elif "coords" in data:
+                coords = data["coords"]
+            else:
+                raise KeyError(f"NPZ must contain 'positions' or 'coords'. Found: {list(data.keys())}")
+            positions = torch.tensor(coords, dtype=torch.float32)
+        except Exception as e:
+            raise ValueError(f"Failed to load NPZ {traj_source}: {e}")
             
-        # TimeWarp data might include hydrogens or be heavy-only. 
-        # We need to match the atom_types dimension.
-        # If coords shape [N, n_all, 3] and atom_types [n_heavy], we need to slice.
-        
-        # Check dimensions
-        n_atoms_data = coords.shape[1]
-        n_atoms_topo = traj.n_atoms
-        n_heavy = len(atom_types)
-        
-        positions = torch.tensor(coords, dtype=torch.float32)
-        
-        if n_atoms_data == n_atoms_topo and n_atoms_data != n_heavy:
-             # NPZ has all atoms, we need to filter for heavy only to match AL pipeline expectations
-             # Get heavy indices
-             heavy_indices = [a.index for a in traj.topology.atoms if a.element.symbol != "H"]
+    else:
+        # General path (MDTraj) for PDB, LAMMPS, GRO, XYZ
+        try:
+            log.info(f"Loading trajectory from {traj_source} using MDTraj...")
+            # Use topo_path as topology for loading (essential for LAMMPS/GRO without builtin topology)
+            traj = md.load(str(traj_source), top=str(topo_path))
+            positions = torch.tensor(traj.xyz, dtype=torch.float32) # [N, Atoms, 3] in nm
+        except Exception as e:
+             raise ValueError(f"Failed to load trajectory {traj_source}: {e}")
+
+    # 4. Filter Heavy Atoms (if needed)
+    n_atoms_data = positions.shape[1]
+    n_heavy = len(atom_types)
+    
+    if n_atoms_data != n_heavy:
+        if n_atoms_data == traj_top.n_atoms:
+             # Full atoms -> Heavy only
              positions = positions[:, heavy_indices, :]
-        elif n_atoms_data != n_heavy:
-             log.warning(f"Mismatch: NPZ atoms {n_atoms_data} vs Inferred Heavy {n_heavy}. Assuming NPZ is already heavy-only or custom?")
-             
-        _check_units(positions, atom_types)
-        
-        out = {
-            "positions": positions,
-            "atom_types": atom_types
-        }
-        return out
-        
-    except Exception as e:
-        raise ValueError(f"Failed to load NPZ {npz_path}: {e}")
+        else:
+             # Mismatch that isn't simple hydrogen filtering
+             log.warning(f"Atom count mismatch: Data={n_atoms_data}, Heavy={n_heavy}. Assuming data matches 'atom_types' logic or is custom.")
+
+    _check_units(positions, atom_types)
+    
+    out = {
+        "positions": positions,
+        "atom_types": atom_types
+    }
+    return out
+
+# Alias for backward compatibility
+def load_npz_as_al_data(npz_path: Path, pdb_path: Path, scale_factor: float = 1.0) -> dict[str, torch.Tensor]:
+    return load_training_data(traj_path=npz_path, topo_path=pdb_path, scale_factor=scale_factor)
 
 
 def _concat_optional(keys: Iterable[str], datasets: list[dict[str, torch.Tensor]]) -> dict[str, torch.Tensor]:

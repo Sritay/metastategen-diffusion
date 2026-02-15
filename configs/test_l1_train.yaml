@@ -1,0 +1,31 @@
+train:
+  exp_name: test_l1_single_frame
+  out_dir: runs/test_l1
+  seed: 42
+  epochs: 1
+  lr: 1.0e-4
+  grad_clip: 1.0
+  batch_size: 1  # 1 frame dataset will need small batch size
+  save_every: 1
+  rot_aug: False
+
+data:
+  topo_path: data/miscanthus/L1.pdb
+  topology_path: data/miscanthus/L1.psf # Explicitly use PSF for bonds/constraints
+  # traj_path: Omitted -> Should trigger auto-load of L1.pdb as 1-frame traj
+  scale_factor: 1.0
+  num_workers: 0
+
+model:
+  n_layers: 2
+  hidden_dim: 32
+  time_emb_dim: 32
+  n_atom_types: 5 # C,N,O,S,Other
+
+diffusion:
+  T: 10 # Small T for speed
+  beta_start: 1.0e-4
+  beta_end: 0.02
+  schedule: linear
+  recenter_every_step: True
+  scale_factor: 7.0 # From previous learnings

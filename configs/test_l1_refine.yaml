@@ -1,0 +1,14 @@
+diff_config: configs/test_l1_train.yaml
+diff_ckpt: runs/test_l1/checkpoints/final.pt
+force_ckpt: runs/energy_pairwise/best_model.pt # Using existing pairwise model
+out_dir: runs/test_l1_refine
+n_samples: 1 # Just 1 sample
+batch_size: 1
+refinement_steps: 20
+step_size: 1.0e-5
+warmup_steps: 10
+keep_percent: 1.0
+seed: 42
+output_formats: [pdb]
+topology: data/miscanthus/L1.psf # Use PSF for bonds if available? Or PDB? Using PDB for now as train used it.
+refinement_mode: geometric # Geometric (clash removal) since force model might not match L1
