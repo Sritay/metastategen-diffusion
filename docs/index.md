@@ -95,7 +95,8 @@ Molecular Dynamics (MD) simulations are computationally expensive, particularly 
 *   **Active Learning**: Iteratively explores the energy landscape using ensemble uncertainty to discover new metastable states.
 *   **Arbitrary Molecule Support**: Automated topology inference for peptides, polymers (e.g., Lignin), and small molecules.
 *   **Ring Constraints**: Explicitly enforces planarity and rigidity for cyclic systems (e.g., benzene) during generation.
-*   **Low Data Regime**: Capable of training from sparse data (even single structures) using physics-based thermal augmentation.
+*   **Low Data Regime**: Capable of training from sparse data (even **single structures**) using physics-based thermal augmentation.
+*   **Flexible Inputs**: Works with **PDB-only** (single frame), or trajectories in **NPZ, LAMMPS, GRO, and XYZ** formats. Minimum requirement is just a single PDB file.
 
 
 

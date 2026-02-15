@@ -37,9 +37,10 @@ This section controls data loading and preprocessing.
 #### Base Parameters (Path & Topology)
 | Parameter | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
-| `npz_path` | str | **Required** | Path to NPZ file containing coordinate data. |
-| `pdb_path` | str | **Required** | Path to PDB file for topology/connectivity inference. |
-| `topology_path` | str | Optional | Path to PSF/GRO if PDB is insufficient (e.g. for complex polymers). |
+| `topo_path` | str | **Required** | Path to PDB/PSF for topology, connectivity, and graph inference. |
+| `traj_path` | str | Optional | Path to Trajectory (NPZ, LAMMPS, GRO, XYZ, or PDB). If omitted, `topo_path` is used as a single-frame trajectory. |
+| `npz_path` | str | Legacy | Alias for `traj_path` (backward compatibility). |
+| `pdb_path` | str | Legacy | Alias for `topo_path` (backward compatibility). |
 | `scale_factor` | float | 1.0 | Global scaling factor for coordinates (e.g. 0.1 to convert Angstrom to nm). |
 | `batch_size` | int | 256 | Batch size for training/sampling. |
 | `num_workers` | int | 4 | Number of DataLoader workers. |

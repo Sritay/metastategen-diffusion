@@ -92,3 +92,16 @@ Each output file contains a dictionary with keys:
 | `al_seed.pt` | Initial Training Data | 100 - 5000 |
 | `al_val.pt` | Metrics & Early Stopping | 2000 - 20000 |
 | `al_pool_ref.pt` | Oracle Search Space | ~200,000 |
+
+---
+
+## 4. Generalized Data Loading (New in v0.2)
+
+**Location**: `src/metastategen/data/manager.py`
+
+The new `load_training_data` function allows the training and AL loops to bypass manual preprocessing scripts for standard use cases.
+
+### Logic
+1.  **Input**: Accepts `traj_path` (NPZ/PDB/LAMMPS/GRO/XYZ) and `topo_path` (PDB/PSF).
+2.  **Fallback**: If `traj_path` is missing, it loads `topo_path` as a single-frame trajectory (useful for Lignin/Single-Structure runs).
+3.  **AL Integration**: `active_learning.py` uses this to load raw data and performs an **in-memory split** (Seed/Val/Pool) if the split files `.pt` don't exist yet. This simplifies the user workflow significantly.

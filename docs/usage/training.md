@@ -42,8 +42,8 @@ train:
 
 data:
   # Universal Data Loader inputs
-  npz_path: data/timewarp/AACG/AACG-traj-arrays.npz
-  pdb_path: data/timewarp/AACG/AACG-traj-state0.pdb
+  topo_path: data/timewarp/AACG/AACG-traj-state0.pdb
+  traj_path: data/timewarp/AACG/AACG-traj-arrays.npz # Optional (can be LAMMPS/GRO/XYZ/PDB)
   scale_factor: 1.0
   batch_size: 64
 
@@ -57,18 +57,18 @@ diffusion:
   beta_end: 0.02
 ```
 
-```
-
 ### Low Data Training
 For systems with very limited data (e.g., a single PDB frame of a lignin polymer), MetaStateGen can automatically augment the data with thermal noise and rotations.
+You only need to provide the topology file; it will be used as the single-frame trajectory automatically.
 
 ```yaml
 data:
-  # Single frame input
-  npz_path: data/lignin/L0.npz
-  pdb_path: data/lignin/L0.pdb
+  # Single frame input (PDB-only)
+  topo_path: data/lignin/L0.pdb
+  # traj_path: Omitted (Implies use topo_path as 1-frame trajectory)
+  
   # Optional: Separate topology file (if PDB lacks bonds)
-  topology_path: data/lignin/L0.psf
+  # topology_path: data/lignin/L0.psf
   
   # Augmentation Controls
   augment_low_data: true
@@ -85,7 +85,7 @@ Use this mode to iteratively discover new metastable states. The loop trains an 
 
 ### Features
 *   **Ensemble Training**: Trains multiple models (seeds) to estimate epistemic uncertainty.
-*   **Auto-Splitting**: Automatically splits a raw dataset into Seed (initial), Pool (oracle), and Validation sets.
+*   **Auto-Splitting**: Automatically splits a raw dataset (PDB, NPZ, or LAMMPS) into Seed (initial), Pool (oracle), and Validation sets.
 *   **Iterative Loop**: Sampling $\to$ Acquisition $\to$ Oracle $\to$ Retraining.
 
 ### Running via CLI
@@ -111,8 +111,10 @@ ensemble:
   members: 4  # Number of models in ensemble
 
 data:
-  npz_path: data/processed/ala2.npz
-  pdb_path: data/processed/ala2.pdb
+  # Input for Auto-Splitting (if splits don't exist)
+  topo_path: data/processed/ala2.pdb
+  traj_path: data/processed/ala2.npz
+  
   # Paths where splits will be saved/loaded
   seed_path: runs/al_experiment/splits/seed.pt
   pool_path: runs/al_experiment/splits/pool.pt
