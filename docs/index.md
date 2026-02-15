@@ -36,7 +36,7 @@ We combine **Geometric Deep Learning (EGNN)** for capturing molecular symmetries
     </div>
   </div>
   <br>
-  <em><strong>Figure 1: Generation in Action.</strong> The diffusion model generates diverse structures for both rigid peptide backbones and flexible aromatic polymers, which are then reconstructed and refined into full all-atom structures.</em>
+  <em><strong>Figure 1: Generation in Action.</strong> The diffusion model generates diverse structures for both rigid peptide backbones and flexible aromatic polymers (generated from a single frame; see <a href="usage/training.html#low-data-training">Low Data Training</a>).</em>
 </div>
 
 ---
@@ -53,7 +53,7 @@ Molecular Dynamics (MD) simulations are computationally expensive, particularly 
 4.  **Generalization**: Support for arbitrary topologies via graph-based inference.
 
 ### Future Directions
-*   **Oracle Expansion**: Integration with AIMD/CP2K for ground truth energy evaluation on larger systems.
+*   **Oracle Expansion**: Integration with AIMD/CP2K for ground truth evaluation on larger systems.
 
 ---
 
@@ -96,7 +96,7 @@ Molecular Dynamics (MD) simulations are computationally expensive, particularly 
 *   **Arbitrary Molecule Support**: Automated topology inference for peptides, polymers (e.g., Lignin), and small molecules.
 *   **Ring Constraints**: Explicitly enforces planarity and rigidity for cyclic systems (e.g., benzene) during generation.
 *   **Low Data Regime**: Capable of training from sparse data (even **single structures**) using physics-based thermal augmentation.
-*   **Flexible Inputs**: Works with **PDB-only** (single frame), or trajectories in **NPZ, LAMMPS, GRO, and XYZ** formats. Minimum requirement is just a single PDB file.
+*   **Flexible Inputs**: Works with **PDB-only** (single frame), or trajectories in **NPZ, LAMMPS, GRO, and XYZ** formats. Minimum requirement is just a single PDB file (must contain `CONECT` records).
 
 
 

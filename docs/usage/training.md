@@ -77,6 +77,12 @@ data:
   aug_noise_scale: 0.05   # Add 0.05 Angstrom thermal jitter
 ```
 
+#### How Low Data Augmentation Works
+When `augment_low_data: true` is enabled and the input dataset is smaller than `min_aug_frames`:
+1.  **Replication**: The available frames are duplicated to reach `aug_n_copies` (e.g., 1000).
+2.  **Thermal Jitter**: Independent Gaussian noise ($\sigma=$ `aug_noise_scale`) is added to each copy. This simulates thermal fluctuations around the equilibrium structure.
+3.  **Rotation**: During training, `train.rot_aug: true` applies random SO(3) rotations to every batch, ensuring the model learns strict rotational invariance even from a single static input.
+
 ---
 
 ## 2. Active Learning Loop

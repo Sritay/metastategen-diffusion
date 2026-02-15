@@ -37,7 +37,7 @@ This section controls data loading and preprocessing.
 #### Base Parameters (Path & Topology)
 | Parameter | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
-| `topo_path` | str | **Required** | Path to PDB/PSF for topology, connectivity, and graph inference. |
+| `topo_path` | str | **Required** | Path to PDB/PSF for topology, connectivity, and graph inference. **Must contain CONECT records** if PDB. |
 | `traj_path` | str | Optional | Path to Trajectory (NPZ, LAMMPS, GRO, XYZ, or PDB). If omitted, `topo_path` is used as a single-frame trajectory. |
 | `npz_path` | str | Legacy | Alias for `traj_path` (backward compatibility). |
 | `pdb_path` | str | Legacy | Alias for `topo_path` (backward compatibility). |
