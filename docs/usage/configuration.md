@@ -35,6 +35,7 @@ A standard config file (`configs/*.yaml`) is divided into these blocks:
 This section controls data loading and preprocessing.
 
 #### Base Parameters (Path & Topology)
+
 | Parameter | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
 | `topo_path` | str | **Required** | Path to PDB/PSF for topology, connectivity, and graph inference. **Must contain CONECT records** if PDB. |
@@ -46,6 +47,7 @@ This section controls data loading and preprocessing.
 | `num_workers` | int | 4 | Number of DataLoader workers. |
 
 #### Low Data Augmentation
+
 | Parameter | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
 | `augment_low_data` | bool | true | Enable thermal augmentation if dataset is small. |
@@ -54,6 +56,7 @@ This section controls data loading and preprocessing.
 | `aug_noise_scale` | float | 0.05 | Standard deviation of Gaussian noise added during augmentation. |
 
 #### Pre-Splits (Advanced / AL Resume)
+
 | Parameter | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
 | `seed_path` | str | Optional | Path to initial labeled training set (`.pt`). |

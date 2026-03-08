@@ -2,6 +2,7 @@
 layout: default
 title: Usage Guide
 nav_order: 5
+has_children: true
 math: mathjax
 ---
 
@@ -11,24 +12,7 @@ math: mathjax
 
 ---
 
-
-
----
-
-Please select a topic from below or the sidebar:
-
-*   **[Installation](usage/installation.md)**: Setup instructions.
-*   **[Verification (Small Runs)](usage/verification.md)**: Quick-start commands to verify installation with minimal compute.
-*   **[Inference (Sampling)](usage/inference.md)**: Using pretrained models to generate structures.
-*   **[Training (Dev)](usage/training.md)**: Training from scratch and Active Learning loops.
-*   **[Analysis & Visualization](usage/analysis.md)**: Using the analysis scripts.
-*   **[Configuration](usage/configuration.md)**: Config file reference and CLI options.
-
----
-
-
-
-
+Please select a topic from the table of contents below or from the sidebar.
 
 ---
 

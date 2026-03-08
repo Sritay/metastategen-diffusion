@@ -16,10 +16,10 @@ This section provides a deep technical dive into the model architectures, data s
 
 ## Datasets
 
-### 1. MDShare (Backbone Only)
+### 1. MDShare (Backbone Benchmark Example)
 *   **Role**: Training data for the Active Learning (Diffusion) loop.
-*   **Structure**: 10-atom point clouds of Alanine Dipeptide.
-*   **Atom Selection**: N, CA, C, O, CB (Sidechain Carbon), and associated backbone atoms. Hydrogens are implicitly ignored.
+*   **Structure**: 3D point clouds corresponding to the atoms defined in the input topology (e.g., 10-atom backbone of Alanine Dipeptide).
+*   **Atom Selection**: For the Alanine benchmark, N, CA, C, O, CB (Sidechain Carbon), and associated backbone atoms are used. Hydrogens are implicitly ignored.
 *   **Source**: A 250,000-frame Molecular Dynamics trajectory provided by the MDShare project.
 *   **Preprocessing**:
     *   **Centering**: All molecules are translated so their Center of Mass (COM) is at the origin.
@@ -72,7 +72,7 @@ The EGNN updates both the scalar features $h$ and vector coordinates $\vec{r}$ e
     *   **Atom Types**: One-hot encodings (C, N, O) form the initial node features $h_i^0$.
 
 #### Chirality Fix
-Standard EGNNs are **O(3)** equivariant (invariant to reflection/mirroring). This is problematic for chiral molecules like Alanine, where L-Ala and D-Ala are distinct enantiomers with different energies.
+Standard EGNNs are **O(3)** equivariant (invariant to reflection/mirroring). This is problematic for chiral molecules (e.g. Alanine), where L and D forms are distinct enantiomers with different energies.
 
 **Solution**: We explicitly compute **Chiral Volume** terms (scalar triple products) and inject them as additional scalar features into the Edge MLP $\phi_e$.
 

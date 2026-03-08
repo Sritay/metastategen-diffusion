@@ -14,16 +14,16 @@ math: mathjax
 The Refinement Loop converts the coarse, generated backbones into physically valid, generic low-energy states.
 
 ### Step 1: Template Alignment & Reconstruction (Common)
-*   **Function**: `align_and_reconstruct` (from `metastategen.reconstruct`)
 *   **Input**: Backbone atoms from Diffusion ($X_{gen}$).
-*   **Algorithm**: 
-    1.  **Global Alignment (Rigid)**: Uses Kabsch Algorithm for proteins/peptides.
-    2.  **Local Frame Reconstruction (Flexible)**: Uses neighbor-based coordinate frames for flexible chains (e.g. Lignin). Includes **robust degeneracy handling** to prevent atom collapse on distorted backbones.
-    1.  We take a reference template structure (specified via `--topology`).
-    2.  We extract its backbone atoms (identified via `mdtraj`).
-    3.  We compute the optimal Rotation $R$ and Translation $T$ to align the template backbone to $X_{gen}$.
-    4.  We apply $(R, T)$ to the **full** template.
-    5.  **Critical Step**: We overwrite the backbone positions with $X_{gen}$ to preserve the diffusion model's generated conformation, while keeping side-chains attached rigidly to the aligned frame.
+*   **Algorithm Modes**: 
+    *   **Global Alignment (Rigid)**: Uses Kabsch Algorithm for proteins/peptides.
+    *   **Local Frame Reconstruction (Flexible)**: Uses neighbor-based coordinate frames for flexible chains (e.g. Lignin). Includes **robust degeneracy handling** to prevent atom collapse on distorted backbones.
+*   **Reconstruction Flow**:
+    1.  Take a reference template structure.
+    2.  Extract its backbone/reference atoms.
+    3.  Compute the optimal Rotation $R$ and Translation $T$ to align the template backbone to $X_{gen}$.
+    4.  Apply $(R, T)$ to the **full** template.
+    5.  **Critical Step**: Overwrite the backbone positions with $X_{gen}$ to preserve the diffusion model's generated conformation, while keeping side-chains attached rigidly to the aligned frame.
 
 ### Step 2: Refinement Strategy (Choose One)
 

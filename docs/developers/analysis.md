@@ -18,7 +18,7 @@ This section explains the post-processing scripts used to verify model quality.
 This helper script provides the **Ground Truth** Ramachandran landscape used as a background in all visualization plots.
 
 ### Logic
-*   **Data Source**: It loads a large, pre-calculated validation set (typically Loop 5 or a dedicated reference set) containing $\sim 250,000$ frames of Alanine Dipeptide simulation.
+*   **Data Source**: It loads a large, pre-calculated validation set (typically Loop 5 or a dedicated reference set) containing the target simulation frames (e.g., $\sim 250,000$ frames of Alanine Dipeptide).
 *   **Contour Plot**: It computes the 2D histogram of this reference data and applies Gaussian smoothing.
 *   **Overlay**: The function `plot_regions(ax)` draws filled contours (using `ax.contourf`) of this ground truth distribution onto any matplotlib axis passed to it.
 *   **Labels**: It explicitly labels known metastable basins:
@@ -38,7 +38,7 @@ Visualizes how the model's learned distribution $P(x)$ changes over AL iteration
 ### Arguments
 *   `--run`: Path to AL output directory (e.g., `runs/day11...`).
 *   `--iters`: Comma-separated list of iterations to plot (e.g., "0,5,10,20").
-*   `--pdb`: Reference PDB for atom indices (default: `alanine-dipeptide-nowater.pdb`).
+*   `--pdb`: Reference PDB for atom indices.
 
 ### Logic
 1.  **Iterate**: Loops through requested `iter_XX` folders.
