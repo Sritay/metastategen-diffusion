@@ -113,8 +113,8 @@ def build_parser() -> argparse.ArgumentParser:
     ps.add_argument("--output-formats", nargs='+', default=['pdb', 'lammps_data'], 
                     help="List of output formats: pdb, gro, xyz, lammps_dump, lammps_data")
     ps.add_argument("--topology", type=str, default=None, help="Path to topology file (PDB)")
-    ps.add_argument("--refinement-mode", type=str, default="mlip", choices=["mlip", "geometric"],
-                    help="Refinement type: 'mlip' (Force Field) or 'geometric' (Clash Removal)")
+    ps.add_argument("--refinement-mode", type=str, default="mlip", choices=["mlip", "geometric", "rdkit"],
+                    help="Refinement type: 'mlip' (Force Field), 'geometric' (Clash Removal), or 'rdkit' (UFF/MMFF)")
     ps.add_argument("--connectivity", type=str, default=None, help="Path to PSF/GRO for bonds")
     ps.set_defaults(func=_cmd_sample)
 

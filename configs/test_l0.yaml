@@ -1,0 +1,40 @@
+train:
+  project: "metastategen-lignin-test"
+  exp_id: "test_l0_aug"
+  out_dir: "experiments/lignin"
+  seed: 42
+  epochs: 5
+  save_every: 5
+  lr: 3e-4
+  grad_clip: 1.0
+  rot_aug: true
+
+data:
+  # Lignin L0
+  npz_path: "data/miscanthus/L0.npz"
+  pdb_path: "data/miscanthus/L0.pdb"
+  topology_path: "data/miscanthus/L0.psf"
+  
+  # Augmentation
+  augment_low_data: true
+  min_aug_frames: 100
+  aug_n_copies: 1000
+  aug_noise_scale: 0.05
+  
+  batch_size: 16
+  num_workers: 0 # Local verification
+
+model:
+  n_layers: 2
+  hidden_dim: 32
+  time_emb_dim: 16
+  # Atom types inferred from topology (should be <10)
+  n_atom_types: 10 
+  use_chiral_features: true
+  
+diffusion:
+  T: 50
+  beta_start: 0.0001
+  beta_end: 0.02
+  schedule: "linear"
+  recenter_every_step: true

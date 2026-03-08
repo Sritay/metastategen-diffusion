@@ -49,7 +49,10 @@ Molecular Dynamics (MD) simulations are computationally expensive, particularly 
 ### Methodology
 1.  **EGNN-based Denoising Diffusion**: An E(3)-equivariant Graph Neural Network (EGNN) learns to reverse a diffusion process, approximating the **underlying conformational distribution** of the heavy-atom backbone.
 2.  **Active Learning**: An iterative acquisition strategy uses ensemble uncertainty to guide the model towards unexplored regions of the energy landscape, efficiently covering metastable basins.
-3.  **Refinement**: A physics-based **Pairwise Energy Surrogate** relaxes the generated backbones via Langevin dynamics to specific local minima, ensuring physical validity and correct geometry.
+3.  **Refinement**: After generation, the model relies on one of three methods to reconstruct full atom geometries (including hydrogens) and relax the structures to valid physical states:
+    *   **Geometric Refinement**: Model-free model clash removal and rigid geometry solver.
+    *   **Pairwise Energy Surrogate (MLIP)**: Fast, differentiable physics-based relaxation learned from training potentials.
+    *   **RDKit**: Universal Force Field (UFF) minimization and deterministic hydrogen placement for arbitrary molecules.
 4.  **Generalization**: Support for arbitrary topologies via graph-based inference.
 
 ### Future Directions

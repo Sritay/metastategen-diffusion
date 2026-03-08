@@ -135,6 +135,7 @@ The `msgen sample` command works differently. Instead of a YAML file, it uses di
 | `--warmup-steps` | Steps with bond constraints enabled | 1000 |
 | `--step-size` | Langevin step size ($\eta$) | 1e-5 |
 | `--keep-percent` | Fraction of lowest energy structures to keep | 1.0 (100%) |
+| `--refinement-mode` | Refinement type: `mlip`, `geometric`, or `rdkit` | `mlip` |
 
 ---
 

@@ -23,6 +23,7 @@ dependencies = [
   "pandas",
   "wandb",
   "networkx",
+  "rdkit",
 ]
 
 [project.scripts]

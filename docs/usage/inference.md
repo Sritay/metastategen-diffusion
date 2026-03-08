@@ -48,13 +48,25 @@ msgen sample \
     --n-samples 100
 ```
 
+#### 3. RDKit Refinement (UFF Relaxation)
+Deterministically reconstructs hydrogens and performs a full structural relaxation using the Universal Force Field (UFF) implemented in RDKit.
+
+```bash
+msgen sample \
+    --diff-ckpt pretrained_models/diffusion_model.pt \
+    --topology data/raw/alanine-dipeptide-nowater.pdb \
+    --out-dir runs/test_rdkit \
+    --refinement-mode rdkit \
+    --n-samples 100
+```
+
 ### Key Arguments
 
 | Argument | Default | Description |
 | :--- | :--- | :--- |
 | `--diff-ckpt` | Required | Path to the trained Diffusion Model checkpoint (`.pt`). |
 | `--force-ckpt` | Optional | Path to the trained Pairwise Energy Model (Required if mode=`mlip`). |
-| `--refinement-mode` | `mlip` | Refinement Strategy: `mlip` (Force Field, energy optimization) or `geometric` (Clash Removal, topology constraints). |
+| `--refinement-mode` | `mlip` | Refinement Strategy: `mlip` (Force Field), `geometric` (Clash Removal), or `rdkit` (UFF Relaxation). |
 | `--n-samples` | 100 | Number of structures to generate. |
 | `--batch-size` | 100 | Batch size for inference (adjust based on GPU memory). |
 | `--refinement-steps` | 2000 | Number of gradient descent steps. |

@@ -13,6 +13,7 @@ from metastategen.models.pairwise import PairwiseEnergyModel
 from metastategen.reconstruct import align_and_reconstruct
 from metastategen.utils import io_formats
 from metastategen.data.topology import MoleculeTopology
+from metastategen.rdkit_refine import build_rdkit_molecule, rdkit_reconstruct_and_refine
 
 log = get_logger("sample_refined")
 
@@ -229,6 +230,12 @@ def run_sampling(
         force_model.eval()
     elif refinement_mode == "geometric":
         log.info("Using Geometric Refinement (Clash Removal). MLIP model not loaded.")
+    elif refinement_mode == "rdkit":
+        log.info("Using RDKit Refinement. Checking RDKit molecule load...")
+        try:
+            rdkit_mol = build_rdkit_molecule(topology_path)
+        except Exception as e:
+            raise RuntimeError(f"Failed to load RDKit molecule: {e}")
     else:
         raise ValueError(f"Unknown refinement_mode: {refinement_mode}")
     
@@ -397,6 +404,16 @@ def run_sampling(
                         x_curr.data = constrain_bonds(x_curr.data, constraints_refine)
             
             refined_samples.append(x_curr.detach().cpu())
+            
+        elif refinement_mode == "rdkit":
+            # RDKit H-Reconstruction and Refinement
+            x_recon_rdkit, x_refined_rdkit = rdkit_reconstruct_and_refine(
+                x_gen, rdkit_mol, topo.heavy_indices
+            )
+            # RDKit places hydrogens much better, overwrite the rigid reconstruction
+            initial_samples[-1] = x_recon_rdkit.cpu()
+            refined_samples.append(x_refined_rdkit.cpu())
+            print(f"[DEBUG] Batch {i+1}: rdkit refinement done, range=[{x_refined_rdkit.min():.3f},{x_refined_rdkit.max():.3f}]", flush=True)
 
     # Save Results
     results = {
