@@ -26,7 +26,7 @@ The modern `load_training_data` function allows the training and Active Learning
 
 ## 2. Legacy Alanine Dipeptide Benchmarks
 
-For testing, benchmarking, and historical reproducibility, we include scripts to process the standard Alanine Dipeptide simulation data from `mdshare`.
+For testing, benchmarking, and historical reproducibility, scripts are included to process the standard Alanine Dipeptide simulation data from `mdshare`.
 
 ### 2a. Data Download (`get_mdshare_data.py`)
 

@@ -18,7 +18,7 @@ cd metastategen-diffusion
 ```
 
 ## 2. Environment Setup
-We recommended using `venv` or `conda` with **Python 3.10+**.
+It is recommended to use `venv` or `conda` with **Python 3.10+**.
 
 ```bash
 # Create environment

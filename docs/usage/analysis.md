@@ -11,7 +11,7 @@ nav_order: 4
 
 ---
 
-We provide a suite of scripts in `scripts/analysis/` to verify the active learning and refinement results.
+A suite of scripts is provided in `scripts/analysis/` to verify the active learning and refinement results.
 
 ## 1. AL Density Evolution
 visualize how the model's generated distribution covers the Ramachandran landscape over iterations.

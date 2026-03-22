@@ -30,7 +30,7 @@ This section provides a deep technical dive into the model architectures, data s
 *   **Role**: Training data for the Pairwise Surrogate/Refinement loop.
 *   **Structure**: Full 22-atom system including all Hydrogens.
 *   **Rich Labels**: Unlike MDShare, this dataset includes **Forces** ($F_i \in \mathbb{R}^3$) and **Potential Energy** ($E \in \mathbb{R}$) for every frame.
-*   **Necessity**: Diffusion models can learn distributions $p(x)$ from positions alone. However, to *refine* a structure, we need to minimize energy $\nabla_x E$. This requires learning the energy landscape, for which force labels are crucial supervision.
+*   **Necessity**: Diffusion models can learn distributions $p(x)$ from positions alone. However, to *refine* a structure, it is necessary to minimize energy $\nabla_x E$. This requires learning the energy landscape, for which force labels are crucial supervision.
 
 ---
 
@@ -38,7 +38,7 @@ This section provides a deep technical dive into the model architectures, data s
 
 ### 1. Backbone Diffusion Model: E(n) Equivariant Graph Neural Network (EGNN)
 
-The diffusion model learns to reverse a noise process. Specifically, it predicts the noise $\epsilon$ added to a structure at timestep $t$. We utilize an **EGNN** because of its variance properties: if the input molecule rotates, the predicted noise vectors rotate exactly the same way (**Equivariance**), while the internal scalar features remain unchanged (**Invariance**).
+The diffusion model learns to reverse a noise process. Specifically, it predicts the noise $\epsilon$ added to a structure at timestep $t$. An **EGNN** is utilized because of its variance properties: if the input molecule rotates, the predicted noise vectors rotate exactly the same way (**Equivariance**), while the internal scalar features remain unchanged (**Invariance**).
 
 **Class**: `metastategen.models.egnn.EGNN`
 
@@ -56,7 +56,7 @@ The diffusion model learns to reverse a noise process. Specifically, it predicts
 
 The EGNN updates both the scalar features $h$ and vector coordinates $\vec{r}$ equivariantly:
 
-1.  **Edge Update**: We verify pairwise interactions based on distance and atom states.
+1.  **Edge Update**: Pairwise interactions are verified based on distance and atom states.
     $$ m_{ij} = \phi_e \left( h_i^l, h_j^l, \lVert \vec{r}_i^l - \vec{r}_j^l \rVert^2, \text{emb}(t) \right) $$
 2.  **Coordinate Update**: Positions are nudged based on the message. The sum of differences ensures translation invariance.
     $$ \vec{r}_i^{l+1} = \vec{r}_i^l + \sum_{j \neq i} (\vec{r}_i^l - \vec{r}_j^l) \cdot \phi_x(m_{ij}) $$
@@ -74,7 +74,7 @@ The EGNN updates both the scalar features $h$ and vector coordinates $\vec{r}$ e
 #### Chirality Fix
 Standard EGNNs are **O(3)** equivariant (invariant to reflection/mirroring). This is problematic for chiral molecules (e.g. Alanine), where L and D forms are distinct enantiomers with different energies.
 
-**Solution**: We explicitly compute **Chiral Volume** terms (scalar triple products) and inject them as additional scalar features into the Edge MLP $\phi_e$.
+**Solution**: **Chiral Volume** terms (scalar triple products) are explicitly computed and injected as additional scalar features into the Edge MLP $\phi_e$.
 
 $$ V = \vec{r}_{N-CA} \cdot (\vec{r}_{CB-CA} \times \vec{r}_{C-CA}) $$
 
@@ -95,7 +95,7 @@ $$ E_{total} = \sum_{i < j} \Psi_{\theta}(d_{ij}) $$
 
 #### Input Pre-processing
 1.  **Distances**: Compute all pairwise distances $d_{ij}$ ($N(N-1)/2$ pairs). For 22 atoms, this is ~231 pairs.
-2.  **RBF Expansion**: We explicitly expand scalar distances into a high-dimensional vector using **Gaussian Radial Basis Functions (RBF)** to capturing short/medium/long range effects distinctly.
+2.  **RBF Expansion**: Scalar distances are explicitly expanded into a high-dimensional vector using **Gaussian Radial Basis Functions (RBF)** to capturing short/medium/long range effects distinctly.
     $$ \text{RBF}_k(d) = \exp \left( - \frac{(d - \mu_k)^2}{\sigma^2} \right) $$
     *   **Parameters**: $N_{RBF}=32$ centers ($\mu_k$) spread linearly from 0Å to 10Å.
 
@@ -108,7 +108,7 @@ $$ E_{total} = \sum_{i < j} \Psi_{\theta}(d_{ij}) $$
 *   **Aggregation**: Summing the outputs of all pairs yields the total scalar Energy $E$.
 
 #### Conservative Forces via Autograd
-We do **not** train a separate network to predict forces. Instead, we compute the gradient of the predicted energy with respect to atomic input coordinates:
+A separate network is **not** trained to predict forces. Instead, the gradient of the predicted energy with respect to atomic input coordinates is computed:
 
 $$ \vec{F}_i = - \nabla_{\vec{r}_i} E_{total}(\vec{r}) $$
 

@@ -17,10 +17,10 @@ Welcome to the **MetaStateGen Diffusion** project documentation.
 > **Project Status**: This research software is currently under active development. Features, APIs, and documentation are undergoing frequent updates and are subject to change.
 
 ## Project Goal
-This project builds a Machine Learning model capable of predicting metastable states for generic molecular systems. Our framework readily accepts single structures or full trajectories for any system with a valid input topology. 
-We demonstrate the model's capabilities using **Alanine Dipeptide** as a benchmark for evaluating generation of metastable dynamics, as well as **Lignin** as a complex flexible system.
+This project builds a Machine Learning model capable of predicting metastable states for generic molecular systems. The framework readily accepts single structures or full trajectories for any system with a valid input topology. 
+The model's capabilities are demonstrated using **Alanine Dipeptide** as a benchmark for evaluating generation of metastable dynamics, as well as **Lignin** as a complex flexible system.
 
-We combine **Geometric Deep Learning (EGNN)** for capturing molecular symmetries with **Active Learning** to iteratively explore and learn the conformational landscape efficiently.
+**Geometric Deep Learning (EGNN)** for capturing molecular symmetries is combined with **Active Learning** to iteratively explore and learn the conformational landscape efficiently.
 
 <div align="center">
   <div style="display: flex; justify-content: center; gap: 20px;">
